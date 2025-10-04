@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 import uuid
 
 from app.models.trip import TripCreate, TripPlan, FlightSearch
+from app.models.weather import WeatherRequest, WeatherResponse
 from app.models.user import TokenData
 from app.services.supabase_service import SupabaseService
+from app.services.weather_service import get_weather_service, WeatherService
 from app.api.deps import get_current_user, get_supabase_dep
 
 router = APIRouter()
@@ -98,28 +100,100 @@ async def search_flights(
     )
 
 
-@router.post("/{trip_id}/weather")
+@router.post("/{trip_id}/weather", response_model=WeatherResponse)
 async def get_weather_forecast(
     trip_id: str,
+    weather_request: WeatherRequest,
     current_user: TokenData = Depends(get_current_user),
-    supabase: SupabaseService = Depends(get_supabase_dep)
+    supabase: SupabaseService = Depends(get_supabase_dep),
+    weather_service: WeatherService = Depends(get_weather_service)
 ):
     """
-    Get weather forecast for trip destination
+    Get weather forecast for specific coordinates
 
     Args:
         trip_id: Trip ID
+        weather_request: Weather request with coordinates and days
         current_user: Authenticated user
         supabase: Supabase service
+        weather_service: Weather service
 
     Returns:
-        Weather forecast
+        Weather forecast data
     """
-    # TODO: Implement weather API integration
-    raise HTTPException(
-        status_code=501,
-        detail="Weather forecast not yet implemented"
-    )
+    try:
+        # Verify trip ownership
+        trip = await supabase.get_trip_plan(trip_id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip plan not found")
+        
+        if trip.user_id != current_user.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to access this trip")
+
+        # Get weather forecast
+        weather_data = await weather_service.get_forecast(
+            latitude=weather_request.latitude,
+            longitude=weather_request.longitude,
+            days=weather_request.days
+        )
+
+        return WeatherResponse(
+            success=True,
+            data=weather_data,
+            location=weather_data.get("location"),
+            coordinates={
+                "latitude": weather_request.latitude,
+                "longitude": weather_request.longitude
+            },
+            forecast_days=weather_request.days
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch weather data: {str(e)}")
+
+
+@router.post("/weather", response_model=WeatherResponse)
+async def get_weather_forecast_standalone(
+    weather_request: WeatherRequest,
+    current_user: TokenData = Depends(get_current_user),
+    weather_service: WeatherService = Depends(get_weather_service)
+):
+    """
+    Get weather forecast for specific coordinates (standalone endpoint)
+
+    Args:
+        weather_request: Weather request with coordinates and days
+        current_user: Authenticated user
+        weather_service: Weather service
+
+    Returns:
+        Weather forecast data
+    """
+    try:
+        # Get weather forecast
+        weather_data = await weather_service.get_forecast(
+            latitude=weather_request.latitude,
+            longitude=weather_request.longitude,
+            days=weather_request.days
+        )
+
+        return WeatherResponse(
+            success=True,
+            data=weather_data,
+            location=weather_data.get("location"),
+            coordinates={
+                "latitude": weather_request.latitude,
+                "longitude": weather_request.longitude
+            },
+            forecast_days=weather_request.days
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch weather data: {str(e)}")
 
 
 @router.post("/{trip_id}/poi")

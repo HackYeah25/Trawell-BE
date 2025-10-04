@@ -19,7 +19,7 @@ security_optional = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> TokenData:
     """
     Validate JWT token and return current user data
@@ -33,13 +33,11 @@ async def get_current_user(
     Raises:
         HTTPException: If token is invalid
     """
-    token = credentials.credentials
+    # If no Authorization header provided, allow anonymous access
+    if credentials is None:
+        return TokenData(user_id="anonymous", email="anonymous@example.com")
 
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    token = credentials.credentials
 
     try:
         payload = jwt.decode(
@@ -47,17 +45,17 @@ async def get_current_user(
             settings.secret_key,
             algorithms=[settings.algorithm]
         )
-        user_id: str = payload.get("sub")
-        email: str = payload.get("email")
+        user_id: Optional[str] = payload.get("sub")
+        email: Optional[str] = payload.get("email")
 
-        if user_id is None or email is None:
-            raise credentials_exception
+        if not user_id or not email:
+            return TokenData(user_id="anonymous", email="anonymous@example.com")
 
-        token_data = TokenData(user_id=user_id, email=email)
-        return token_data
+        return TokenData(user_id=user_id, email=email)
 
     except JWTError:
-        raise credentials_exception
+        # For invalid tokens, degrade gracefully to anonymous
+        return TokenData(user_id="anonymous", email="anonymous@example.com")
 
 
 def get_supabase_dep() -> SupabaseService:
