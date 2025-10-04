@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.api import auth, brainstorm, planning, support, websocket, group_brainstorm
+from app.api import auth, brainstorm, planning, support, websocket, group_brainstorm, profiling
 
 # Configure logging
 logging.basicConfig(
@@ -100,6 +100,10 @@ app = FastAPI(
         {
             "name": "WebSocket",
             "description": "WebSocket connections for streaming AI responses"
+        },
+        {
+            "name": "Profiling",
+            "description": "Interactive user profiling with AI-guided questions and validation"
         }
     ],
     servers=[
@@ -160,6 +164,7 @@ async def health_check():
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(profiling.router, tags=["Profiling"])
 app.include_router(brainstorm.router, prefix="/api/brainstorm", tags=["Brainstorm"])
 app.include_router(group_brainstorm.router, tags=["Group Brainstorm"])
 app.include_router(planning.router, prefix="/api/planning", tags=["Planning"])
