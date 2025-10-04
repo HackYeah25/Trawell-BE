@@ -63,6 +63,11 @@ class ProfilingQuestionResponse(BaseModel):
     follow_up_count: int = 0
     answered_at: datetime = Field(default_factory=datetime.utcnow)
 
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
 
 class ProfilingSession(BaseModel):
     """Complete profiling session"""
@@ -77,6 +82,9 @@ class ProfilingSession(BaseModel):
     completed_at: Optional[datetime] = None
 
     class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
         json_schema_extra = {
             "example": {
                 "session_id": "prof_123456",
@@ -96,6 +104,11 @@ class ProfilingMessage(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: Optional[Dict[str, Any]] = None
 
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
 
 class ProfilingConversation(BaseModel):
     """Complete profiling conversation history"""
@@ -114,6 +127,9 @@ class WSProfilingMessage(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
         json_schema_extra = {
             "example": {
                 "type": "profiling_message",

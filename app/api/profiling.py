@@ -3,7 +3,7 @@ Profiling API - User profiling with interactive questions and WebSocket support
 """
 import asyncio
 import uuid
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.responses import JSONResponse
@@ -27,8 +27,9 @@ from app.models.profiling import (
     WSProfilingToken,
 )
 from app.agents.profiling_agent import profiling_agent
-from app.services.supabase import get_supabase
-from app.api.deps import get_current_user
+from app.services.supabase_service import get_supabase
+from app.services.session_service import session_service
+from app.api.deps import get_current_user_optional
 
 router = APIRouter(prefix="/api/profiling", tags=["profiling"])
 
@@ -42,8 +43,18 @@ class ProfilingConnectionManager:
 
     async def connect(self, websocket: WebSocket, session_id: str):
         """Connect a WebSocket to a profiling session"""
+        # Close existing connection if any
+        if session_id in self.active_connections:
+            try:
+                old_ws = self.active_connections[session_id]
+                await old_ws.close(code=1000, reason="New connection established")
+                print(f"DEBUG: Closed old WebSocket for session {session_id}")
+            except Exception as e:
+                print(f"DEBUG: Error closing old WebSocket: {e}")
+
         await websocket.accept()
         self.active_connections[session_id] = websocket
+        print(f"DEBUG: WebSocket connected for session {session_id}")
 
     def disconnect(self, session_id: str):
         """Disconnect a WebSocket from a profiling session"""
@@ -54,39 +65,81 @@ class ProfilingConnectionManager:
         """Send message to specific session"""
         if session_id in self.active_connections:
             try:
-                await self.active_connections[session_id].send_json(message)
+                # Ensure data is JSON serializable
+                import json
+                # Convert datetime objects to strings
+                serializable_message = json.loads(json.dumps(message, default=str))
+                await self.active_connections[session_id].send_json(serializable_message)
+
+                # Debug log (only for non-token messages to avoid spam)
+                if message.get('type') != 'profiling_token':
+                    print(f"DEBUG: Sent {message.get('type')} to session {session_id}")
             except Exception as e:
-                print(f"Error sending to websocket: {e}")
+                print(f"ERROR: Error sending {message.get('type')} to websocket for session {session_id}: {e}")
+                # Clean up disconnected websocket
                 self.disconnect(session_id)
+        else:
+            print(f"WARNING: No active connection for session {session_id} to send {message.get('type')}")
 
 
 manager = ProfilingConnectionManager()
 
 
-# In-memory storage for profiling sessions (in production, use database)
-# session_id -> ProfilingSession
-profiling_sessions: Dict[str, ProfilingSession] = {}
+# Redis-based session storage (replaces in-memory storage)
+async def get_session(session_id: str) -> Optional[ProfilingSession]:
+    """Get session from Redis"""
+    session_data = await session_service.get_session(session_id)
+    if session_data:
+        return ProfilingSession(**session_data)
+    return None
 
-# session_id -> List[ProfilingMessage]
-profiling_conversations: Dict[str, List[ProfilingMessage]] = {}
+
+async def save_session(session: ProfilingSession) -> bool:
+    """Save session to Redis"""
+    return await session_service.update_session(session.session_id, session.model_dump())
+
+
+async def create_session(session: ProfilingSession) -> str:
+    """Create new session in Redis"""
+    return await session_service.create_session(session.model_dump())
+
+
+async def add_message_to_conversation(session_id: str, message: ProfilingMessage) -> bool:
+    """Add message to conversation history"""
+    return await session_service.add_message_to_conversation(
+        session_id, 
+        message.model_dump()
+    )
+
+
+async def get_conversation(session_id: str) -> List[ProfilingMessage]:
+    """Get conversation history"""
+    conversation_data = await session_service.get_conversation(session_id)
+    return [ProfilingMessage(**msg) for msg in conversation_data]
 
 
 # API Endpoints
 @router.get("/questions")
-async def get_profiling_questions() -> GetQuestionsResponse:
+async def get_profiling_questions():
     """Get all profiling questions (for frontend to display)"""
     questions = profiling_agent.get_all_questions()
-    critical = profiling_agent.get_critical_questions()
 
-    return GetQuestionsResponse(
-        questions=questions, total_count=len(questions), critical_questions=critical
-    )
+    # Transform to frontend format
+    frontend_questions = [
+        {
+            "id": q.id,
+            "markdownQuestion": q.question
+        }
+        for q in questions
+    ]
+
+    return frontend_questions
 
 
 @router.post("/start")
 async def start_profiling(
     request: StartProfilingRequest,
-    current_user: Optional[dict] = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_current_user_optional),
 ) -> StartProfilingResponse:
     """Start a new profiling session"""
     session_id = f"prof_{uuid.uuid4().hex[:12]}"
@@ -101,15 +154,16 @@ async def start_profiling(
         profile_completeness=0.0,
     )
 
-    profiling_sessions[session_id] = session
-    profiling_conversations[session_id] = []
+    # Create session in Redis
+    await create_session(session)
+
+    print(f"DEBUG: Created session {session_id}, total sessions: Redis")
 
     intro_message = profiling_agent.get_intro_message()
 
     # Add intro message to conversation
-    profiling_conversations[session_id].append(
-        ProfilingMessage(role="assistant", content=intro_message)
-    )
+    intro_msg = ProfilingMessage(role="assistant", content=intro_message)
+    await add_message_to_conversation(session_id, intro_msg)
 
     websocket_url = f"/api/profiling/ws/{session_id}"
 
@@ -121,10 +175,10 @@ async def start_profiling(
 @router.get("/session/{session_id}")
 async def get_profiling_session(session_id: str) -> ProfilingSessionResponse:
     """Get profiling session details"""
-    if session_id not in profiling_sessions:
+    session = await get_session(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    session = profiling_sessions[session_id]
     next_question = profiling_agent.get_next_question(session)
     is_complete = profiling_agent.is_profile_complete(session)
 
@@ -136,11 +190,12 @@ async def get_profiling_session(session_id: str) -> ProfilingSessionResponse:
 @router.post("/session/{session_id}/abandon")
 async def abandon_profiling_session(session_id: str):
     """Abandon a profiling session"""
-    if session_id not in profiling_sessions:
+    session = await get_session(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    session = profiling_sessions[session_id]
     session.status = ProfilingStatus.ABANDONED
+    await save_session(session)
 
     return {"message": "Session abandoned", "session": session}
 
@@ -153,14 +208,15 @@ async def profiling_websocket_endpoint(
 ):
     """WebSocket endpoint for profiling conversation"""
 
-    # Verify session exists
-    if session_id not in profiling_sessions:
+    # Verify session exists in Redis BEFORE accepting
+    session = await get_session(session_id)
+    if not session:
+        # Accept first, then close with reason
+        await websocket.accept()
         await websocket.close(code=1008, reason="Session not found")
         return
 
-    session = profiling_sessions[session_id]
-
-    # Connect WebSocket
+    # Connect WebSocket (this accepts the connection)
     await manager.connect(websocket, session_id)
 
     # Send current question
@@ -204,10 +260,17 @@ async def profiling_websocket_endpoint(
 
 async def handle_user_answer(session_id: str, answer: str):
     """Process user's answer to current question"""
-    session = profiling_sessions[session_id]
+    print(f"DEBUG: Handling answer for session {session_id}: {answer[:50]}...")
+
+    session = await get_session(session_id)
+    if not session:
+        print(f"ERROR: Session {session_id} not found in Redis")
+        return
+
     current_question = profiling_agent.get_next_question(session)
 
     if not current_question:
+        print(f"DEBUG: Profiling already complete for {session_id}")
         # Already complete
         await manager.send_to_session(
             session_id,
@@ -220,20 +283,23 @@ async def handle_user_answer(session_id: str, answer: str):
         )
         return
 
+    print(f"DEBUG: Current question: {current_question.id}, index: {session.current_question_index}")
+
     # Add user message to conversation
-    profiling_conversations[session_id].append(
-        ProfilingMessage(role="user", content=answer)
-    )
+    user_msg = ProfilingMessage(role="user", content=answer)
+    await add_message_to_conversation(session_id, user_msg)
 
     # Send thinking indicator
     await manager.send_to_session(
         session_id, WSProfilingThinking(conversation_id=session_id).model_dump()
     )
 
+    print(f"DEBUG: Validating answer with LLM...")
     # Validate answer
     validation_status, feedback, extracted_value = await profiling_agent.validate_answer(
         current_question, answer, session
     )
+    print(f"DEBUG: Validation result: {validation_status}, feedback: {feedback}")
 
     # Check if this question already has responses
     existing_response = None
@@ -266,6 +332,9 @@ async def handle_user_answer(session_id: str, answer: str):
                         follow_up_count=1,
                     )
                 )
+
+            # Save session to Redis
+            await save_session(session)
 
             # Stream follow-up
             await stream_ai_message(session_id, response_text)
@@ -322,6 +391,9 @@ async def process_sufficient_answer(
             )
         )
 
+    # Save session to Redis
+    await save_session(session)
+
     # Send validation success
     await manager.send_to_session(
         session_id,
@@ -338,10 +410,16 @@ async def process_sufficient_answer(
     session.profile_completeness = profiling_agent.calculate_completeness(session)
     session.updated_at = datetime.utcnow()
 
+    # Save session to Redis after updating
+    await save_session(session)
+
     # Check if profiling is complete
     if profiling_agent.is_profile_complete(session):
         session.status = ProfilingStatus.COMPLETED
         session.completed_at = datetime.utcnow()
+
+        # Save final session state
+        await save_session(session)
 
         # Extract and save user profile
         user_profile = profiling_agent.extract_user_profile(session)
@@ -356,7 +434,7 @@ async def process_sufficient_answer(
 
         # Send completion message
         completion_msg = profiling_agent.get_completion_message()
-        await stream_ai_message(session_id, completion_msg)
+        await send_question_message(session_id, completion_msg)
 
         await manager.send_to_session(
             session_id,
@@ -371,7 +449,8 @@ async def process_sufficient_answer(
         # Get next question
         next_question = profiling_agent.get_next_question(session)
         if next_question:
-            await stream_ai_message(session_id, next_question.question)
+            # Send question directly (not streaming for pre-defined questions)
+            await send_question_message(session_id, next_question.question)
 
             # Send progress
             await manager.send_to_session(
@@ -386,35 +465,84 @@ async def process_sufficient_answer(
             )
 
 
-async def stream_ai_message(session_id: str, message: str):
-    """Stream AI message token by token using LLM"""
-    session = profiling_sessions[session_id]
+async def send_question_message(session_id: str, question: str):
+    """Send a pre-defined question without LLM streaming"""
+    # Add to conversation
+    await add_message_to_conversation(
+        session_id,
+        ProfilingMessage(role="assistant", content=question)
+    )
+
+    # Send complete message
+    await manager.send_to_session(
+        session_id,
+        WSProfilingMessage(
+            conversation_id=session_id, role="assistant", content=question
+        ).model_dump(),
+    )
+
+
+async def stream_ai_message(session_id: str, follow_up_prompt: str):
+    """Stream AI-generated follow-up message using LLM"""
+    session = await get_session(session_id)
+    if not session:
+        return
 
     # Build conversation history for context
-    conversation_history = [
-        {"role": msg.role, "content": msg.content}
-        for msg in profiling_conversations[session_id]
-    ]
+    conversation = await get_conversation(session_id)
 
-    # Add current message prompt
-    conversation_history.append({"role": "user", "content": message})
-
-    # Stream response from LLM
+    # Stream response from LLM for follow-up
     full_response = ""
 
     try:
-        async for token in profiling_agent.stream_response(session, conversation_history):
-            full_response += token
-            await manager.send_to_session(
-                session_id,
-                WSProfilingToken(conversation_id=session_id, token=token).model_dump(),
-            )
-            await asyncio.sleep(0.01)  # Small delay for better UX
+        # Get current question context
+        current_question = profiling_agent.get_next_question(session)
+        if not current_question:
+            return
+
+        # Build prompt for LLM to generate natural follow-up
+        system_prompt = f"""You are a friendly travel assistant asking follow-up questions.
+
+Current question context: {current_question.context}
+Original question: {current_question.question}
+
+The user gave an answer that needs more detail. Generate a friendly, natural follow-up question.
+Keep it conversational and encouraging. Be specific about what information you need.
+
+Follow-up guidance: {follow_up_prompt}
+"""
+
+        # Create messages for LLM
+        from langchain.schema import SystemMessage, HumanMessage
+
+        messages = [SystemMessage(content=system_prompt)]
+
+        # Add recent conversation for context (last 3 messages)
+        for msg in conversation[-3:]:
+            if msg.role == "user":
+                messages.append(HumanMessage(content=msg.content))
+
+        # Stream response
+        print(f"DEBUG: Starting LLM stream for session {session_id}")
+        token_count = 0
+        async for chunk in profiling_agent.llm.astream(messages):
+            if hasattr(chunk, "content") and chunk.content:
+                token_count += 1
+                full_response += chunk.content
+                await manager.send_to_session(
+                    session_id,
+                    WSProfilingToken(conversation_id=session_id, token=chunk.content).model_dump(),
+                )
+                await asyncio.sleep(0.01)
+        print(f"DEBUG: Streamed {token_count} tokens, full response: {full_response[:100]}...")
+
     except Exception as e:
-        print(f"Error streaming from LLM: {e}")
-        # Fallback to original message
-        full_response = message
-        for token in message.split():
+        print(f"ERROR: Error streaming from LLM: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fallback to simple message
+        full_response = follow_up_prompt
+        for token in follow_up_prompt.split():
             await manager.send_to_session(
                 session_id,
                 WSProfilingToken(conversation_id=session_id, token=token + " ").model_dump(),
@@ -422,7 +550,8 @@ async def stream_ai_message(session_id: str, message: str):
             await asyncio.sleep(0.02)
 
     # Add to conversation
-    profiling_conversations[session_id].append(
+    await add_message_to_conversation(
+        session_id,
         ProfilingMessage(role="assistant", content=full_response)
     )
 

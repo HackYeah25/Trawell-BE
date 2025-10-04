@@ -15,6 +15,7 @@ from app.models.user import TokenData
 
 # Security
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -81,7 +82,7 @@ def get_prompt_loader_dep() -> PromptLoader:
 
 # Optional user dependency (for public endpoints)
 async def get_current_user_optional(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional)
 ) -> Optional[TokenData]:
     """
     Get current user if authenticated, None otherwise

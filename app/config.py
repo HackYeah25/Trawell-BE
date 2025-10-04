@@ -65,12 +65,13 @@ class Settings(BaseSettings):
     default_llm_model: str = "gpt-4-turbo-preview"
     generic_llm_model: str = "gpt-4o-2024-08-06"
     profiling_llm_model: str = "gpt-4o-2024-08-06"
+    claude_model: str = "claude-3-sonnet-20240229"
     default_llm_temperature: float = 0.7
     max_tokens_context: int = 8000
     max_tokens_response: int = 2000
 
     # CORS
-    allowed_origins: str = "http://localhost:3000,http://localhost:5173"
+    allowed_origins: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
 
     # Logging
     log_level: str = "INFO"
