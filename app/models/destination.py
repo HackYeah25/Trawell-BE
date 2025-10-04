@@ -68,8 +68,8 @@ class DestinationDetails(BaseModel):
 
 class DestinationRecommendation(BaseModel):
     """AI-generated destination recommendation"""
-    recommendation_id: str
-    user_id: str
+    recommendation_id: Optional[str] = None
+    user_id: Optional[str] = None
     destination: DestinationInfo
     details: Optional[DestinationDetails] = None # this is filled when we want to go there
     created_at: datetime = Field(default_factory=datetime.utcnow)

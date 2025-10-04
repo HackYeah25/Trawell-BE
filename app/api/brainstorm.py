@@ -2,11 +2,15 @@
 Brainstorm module endpoints - Destination discovery
 """
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Optional, Dict, Any
 import uuid
 
 from app.models.conversation import Conversation, ConversationCreate, MessageCreate, ConversationResponse, Message, MessageRole
-from app.models.destination import BrainstormRequest, BrainstormResponse
+from app.models.destination import (
+    BrainstormRequest,
+    BrainstormResponse,
+    DestinationRecommendation,
+)
 from app.models.user import TokenData
 from app.services.supabase_service import SupabaseService
 from app.services.langchain_service import LangChainService
@@ -19,6 +23,8 @@ from app.api.deps import (
     get_context_manager_dep,
     get_prompt_loader_dep
 )
+from app.services.weather_service import get_weather_service, WeatherService
+from app.services.amadeus_service import AmadeusService
 
 router = APIRouter()
 
@@ -128,6 +134,88 @@ async def send_message(
         message=user_message,
         ai_response=ai_message
     )
+
+
+@router.get("/recommendations")
+async def get_recommendations(
+    current_user: TokenData = Depends(get_current_user),
+    supabase: SupabaseService = Depends(get_supabase_dep),
+    weather_service: WeatherService = Depends(get_weather_service),
+    origin: str = None,
+    weather_days: int = 7,
+):
+    """
+    Get destination recommendations for the current user, optionally enriched
+    with weather forecasts and flight inspiration data.
+
+    Returns:
+        Object containing recommendations and optional extras
+    """
+    recommendations = await supabase.get_user_recommendations(current_user.user_id)
+
+    extras: Dict[str, Any] = {}
+
+    weather_by_recommendation: Dict[str, Any] = {}
+    for rec in recommendations:
+        try:
+            name = getattr(rec.destination, "name", None)
+            if not name:
+                raise ValueError("destination.name is required for weather lookup")
+
+            weather = await weather_service.get_forecast(
+                city=name,
+                days=max(1, min(weather_days, 10)),
+            )
+            weather_by_recommendation[rec.recommendation_id] = weather
+        except Exception as e:
+            weather_by_recommendation[rec.recommendation_id] = {
+                "error": str(e)
+            }
+    extras["weather_by_recommendation"] = weather_by_recommendation
+
+    if not origin:
+        extras["flight_inspiration"] = {
+            "error": "origin is required (IATA code, e.g., JFK)"
+        }
+    else:
+        try:
+            amadeus = AmadeusService(test_mode=True)
+            flights = await amadeus.search_flight_destinations(origin=origin, max_results=20)
+            extras["flight_inspiration"] = {
+                "origin": origin,
+                "data": flights.get("data", [])
+            }
+        except Exception as e:
+            extras["flight_inspiration"] = {"origin": origin, "error": str(e)}
+
+    return {
+        "recommendations": recommendations,
+        "extras": extras,
+    }
+
+
+@router.post("/recommendations", response_model=DestinationRecommendation)
+async def create_recommendation(
+    payload: DestinationRecommendation,
+    current_user: TokenData = Depends(get_current_user),
+    supabase: SupabaseService = Depends(get_supabase_dep)
+):
+    """
+    Create a destination recommendation for the current user
+    """
+    rec = DestinationRecommendation(
+        recommendation_id=payload.recommendation_id or f"rec_{uuid.uuid4().hex[:12]}",
+        user_id=payload.user_id or current_user.user_id,
+        destination=payload.destination,
+        reasoning=payload.reasoning or "",
+        optimal_season=payload.optimal_season or "",
+        estimated_budget=payload.estimated_budget or 0.0,
+        currency=payload.currency,
+        highlights=payload.highlights,
+        deals_found=payload.deals_found,
+        confidence_score=payload.confidence_score,
+    )
+    return await supabase.save_recommendation(rec)
 
 
 @router.get("/{conversation_id}/suggestions")
