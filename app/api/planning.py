@@ -6,7 +6,7 @@ import uuid
 
 from app.models.trip import TripCreate, TripPlan, FlightSearch
 from app.models.user import TokenData
-from app.services.supabase import SupabaseService
+from app.services.supabase_service import SupabaseService
 from app.api.deps import get_current_user, get_supabase_dep
 
 router = APIRouter()

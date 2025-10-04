@@ -25,7 +25,7 @@ from app.models.group_conversation import (
     WSCompatibilityUpdate,
     ConversationStatus,
 )
-from app.services.supabase import get_supabase
+from app.services.supabase_service import get_supabase
 from app.agents.group_moderator import group_moderator
 from app.api.deps import get_current_user
 

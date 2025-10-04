@@ -16,7 +16,7 @@ services:
     depends_on:
       - redis
     volumes:
-      - ./app:/app/app  # Mount for hot reload in development
+      - .:/app
     networks:
       - travel-ai-network
     restart: unless-stopped
@@ -48,7 +48,7 @@ services:
       - redis
       - backend
     volumes:
-      - ./app:/app/app
+      - .:/app
     networks:
       - travel-ai-network
     restart: unless-stopped
@@ -68,7 +68,7 @@ services:
       - redis
       - backend
     volumes:
-      - ./app:/app/app
+      - .:/app
     networks:
       - travel-ai-network
     restart: unless-stopped

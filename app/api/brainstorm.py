@@ -8,7 +8,7 @@ import uuid
 from app.models.conversation import Conversation, ConversationCreate, MessageCreate, ConversationResponse, Message, MessageRole
 from app.models.destination import BrainstormRequest, BrainstormResponse
 from app.models.user import TokenData
-from app.services.supabase import SupabaseService
+from app.services.supabase_service import SupabaseService
 from app.services.langchain_service import LangChainService
 from app.utils.context_manager import ContextManager
 from app.prompts.loader import PromptLoader

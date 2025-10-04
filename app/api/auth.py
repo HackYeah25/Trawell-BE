@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 
 from app.config import settings
 from app.models.user import User, UserCreate, UserLogin, Token
-from app.services.supabase import SupabaseService
+from app.services.supabase_service import SupabaseService
 from app.api.deps import get_supabase_dep
 
 router = APIRouter()

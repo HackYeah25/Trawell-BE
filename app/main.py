@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Debug mode: {settings.debug}")
 
     # Initialize services
-    from app.services.supabase import init_supabase
+    from app.services.supabase_service import init_supabase
     init_supabase()
 
     yield

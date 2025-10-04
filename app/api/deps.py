@@ -7,7 +7,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 
 from app.config import settings
-from app.services.supabase import get_supabase, SupabaseService
+from app.services.supabase_service import get_supabase, SupabaseService
 from app.services.langchain_service import get_langchain_service, LangChainService
 from app.utils.context_manager import get_context_manager, ContextManager
 from app.prompts.loader import get_prompt_loader, PromptLoader
