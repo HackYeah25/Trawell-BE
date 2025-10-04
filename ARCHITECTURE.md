@@ -126,14 +126,14 @@ Supabase
    │
    │ Becomes first message in context
    ▼
-┌──────────────────────────────────────┐
-│ LangChain Context                    │
-│ [                                    │
-│   {role: "system", content: profile},│
-│   {role: "user", content: "..."},    │
+┌───────────────────────────────────────┐
+│ LangChain Context                     │
+│ [                                     │
+│   {role: "system", content: profile}, │
+│   {role: "user", content: "..."},     │
 │   {role: "assistant", content: "..."} │
-│ ]                                    │
-└──────────────────────────────────────┘
+│ ]                                     │
+└───────────────────────────────────────┘
    │
    │ Sent to LLM
    ▼
