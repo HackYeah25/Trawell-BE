@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.api import auth, brainstorm, planning, support, websocket, group_brainstorm, profiling
+from app.api import auth, brainstorm, planning, support, websocket, group_brainstorm, profiling, users
 
 # Configure logging
 logging.basicConfig(
@@ -170,6 +170,7 @@ app.include_router(group_brainstorm.router, tags=["Group Brainstorm"])
 app.include_router(planning.router, prefix="/api/planning", tags=["Planning"])
 app.include_router(support.router, prefix="/api/support", tags=["Support"])
 app.include_router(websocket.router, prefix="/api/ws", tags=["WebSocket"])
+app.include_router(users.router, tags=["User"])  # Provides /api/me endpoints
 
 
 # Global exception handler
