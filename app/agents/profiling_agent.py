@@ -6,7 +6,7 @@ import yaml
 from typing import List, Dict, Any, Optional, AsyncIterator
 from datetime import datetime
 
-from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 
 from app.models.profiling import (
@@ -23,11 +23,12 @@ class ProfilingAgent:
     """Agent for conducting profiling conversations with validation"""
 
     def __init__(self):
-        self.llm = ChatAnthropic(
-            model=settings.claude_model,
-            anthropic_api_key=settings.anthropic_api_key,
+        self.llm = ChatOpenAI(
+            model=settings.profiling_llm_model,
+            api_key=settings.openai_api_key,
             temperature=0.7,
             max_tokens=2000,
+            streaming=True,
         )
 
         # Load profiling configuration from YAML

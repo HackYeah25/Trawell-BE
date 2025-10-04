@@ -63,6 +63,8 @@ class Settings(BaseSettings):
 
     # LLM Configuration
     default_llm_model: str = "gpt-4-turbo-preview"
+    generic_llm_model: str = "gpt-4o-2024-08-06"
+    profiling_llm_model: str = "gpt-4o-2024-08-06"
     default_llm_temperature: float = 0.7
     max_tokens_context: int = 8000
     max_tokens_response: int = 2000

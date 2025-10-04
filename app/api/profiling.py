@@ -387,24 +387,49 @@ async def process_sufficient_answer(
 
 
 async def stream_ai_message(session_id: str, message: str):
-    """Stream AI message token by token"""
+    """Stream AI message token by token using LLM"""
+    session = profiling_sessions[session_id]
+
+    # Build conversation history for context
+    conversation_history = [
+        {"role": msg.role, "content": msg.content}
+        for msg in profiling_conversations[session_id]
+    ]
+
+    # Add current message prompt
+    conversation_history.append({"role": "user", "content": message})
+
+    # Stream response from LLM
+    full_response = ""
+
+    try:
+        async for token in profiling_agent.stream_response(session, conversation_history):
+            full_response += token
+            await manager.send_to_session(
+                session_id,
+                WSProfilingToken(conversation_id=session_id, token=token).model_dump(),
+            )
+            await asyncio.sleep(0.01)  # Small delay for better UX
+    except Exception as e:
+        print(f"Error streaming from LLM: {e}")
+        # Fallback to original message
+        full_response = message
+        for token in message.split():
+            await manager.send_to_session(
+                session_id,
+                WSProfilingToken(conversation_id=session_id, token=token + " ").model_dump(),
+            )
+            await asyncio.sleep(0.02)
+
     # Add to conversation
     profiling_conversations[session_id].append(
-        ProfilingMessage(role="assistant", content=message)
+        ProfilingMessage(role="assistant", content=full_response)
     )
-
-    # Stream tokens
-    for token in message.split():
-        await manager.send_to_session(
-            session_id,
-            WSProfilingToken(conversation_id=session_id, token=token + " ").model_dump(),
-        )
-        await asyncio.sleep(0.02)  # Small delay for better UX
 
     # Send complete message
     await manager.send_to_session(
         session_id,
         WSProfilingMessage(
-            conversation_id=session_id, role="assistant", content=message
+            conversation_id=session_id, role="assistant", content=full_response
         ).model_dump(),
     )

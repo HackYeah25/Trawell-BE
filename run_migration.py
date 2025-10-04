@@ -1,61 +1,78 @@
 #!/usr/bin/env python3
 """
-Run Supabase migration for group conversations
+Run Supabase migrations
 """
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from supabase import create_client
 
-# Load environment
-env_path = Path(__file__).parent / '.env'
-load_dotenv(dotenv_path=env_path)
+# Load environment variables
+load_dotenv()
 
-# Get Supabase credentials
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
-if not supabase_url or not supabase_key:
-    print("❌ Error: SUPABASE_URL and SUPABASE_KEY not found in .env")
-    exit(1)
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    print("❌ Error: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in .env")
+    sys.exit(1)
 
-# Create client
-supabase = create_client(supabase_url, supabase_key)
+print(f"🔗 Supabase URL: {SUPABASE_URL}")
+print(f"🔑 Service Key: {SUPABASE_SERVICE_KEY[:20]}...")
 
-# Read migration
-migration_path = Path(__file__).parent / "supabase" / "migrations" / "001_group_conversations.sql"
-with open(migration_path, 'r') as f:
-    migration_sql = f.read()
+# Get migration files
+migrations_dir = Path(__file__).parent / "supabase" / "migrations"
+migration_files = sorted(migrations_dir.glob("*.sql"))
 
-print("🚀 Running migration: 001_group_conversations.sql")
-print("-" * 60)
+if not migration_files:
+    print("⚠️  No migration files found")
+    sys.exit(0)
 
-try:
-    # Execute migration
-    # Note: Supabase Python client doesn't have direct SQL execution
-    # You need to use the REST API or use supabase CLI
+print(f"\n📁 Found {len(migration_files)} migration file(s):\n")
 
-    print("⚠️  Python Supabase client doesn't support raw SQL execution.")
-    print("\n📋 Options to run migration:\n")
+for migration_file in migration_files:
+    print(f"   • {migration_file.name}")
 
-    print("1. **Supabase Dashboard (Recommended):**")
-    print(f"   - Go to: {supabase_url.replace('supabase.co', 'supabase.com/dashboard/project')}")
-    print("   - Navigate to: SQL Editor")
-    print(f"   - Copy contents from: {migration_path}")
-    print("   - Execute the SQL\n")
+print("\n" + "="*60)
+print("📋 MANUAL MIGRATION REQUIRED")
+print("="*60)
+print("""
+The Supabase Python client doesn't support direct SQL execution.
+Please run migrations manually using one of these methods:
 
-    print("2. **Supabase CLI:**")
-    print("   supabase link --project-ref <your-project-ref>")
-    print("   supabase db push\n")
+METHOD 1: Supabase SQL Editor (Recommended)
+────────────────────────────────────────────
+1. Go to: https://supabase.com/dashboard/project/khuuhyyeyajujqdpzqyz/sql/new
 
-    print("3. **Manual psql:**")
-    print("   Get connection string from Supabase dashboard")
-    print(f"   psql <connection-string> < {migration_path}\n")
+2. Copy & paste SQL from each file:
+""")
 
-    print("-" * 60)
-    print("📄 Migration SQL preview (first 500 chars):")
-    print(migration_sql[:500] + "...\n")
+for i, migration_file in enumerate(migration_files, 1):
+    print(f"\n   Step {i}: {migration_file.name}")
+    print(f"   File: {migration_file}")
 
-except Exception as e:
-    print(f"❌ Error: {e}")
-    exit(1)
+print("""
+3. Click "Run" for each migration
+
+METHOD 2: Supabase CLI
+────────────────────────────────────────────
+$ supabase link --project-ref khuuhyyeyajujqdpzqyz
+$ supabase db push
+
+METHOD 3: Direct PostgreSQL Connection
+────────────────────────────────────────────
+Use the connection string from Supabase dashboard > Project Settings > Database
+Then run: psql <connection_string> < migration_file.sql
+""")
+
+# Show SQL content if requested
+if len(sys.argv) > 1 and sys.argv[1] == "--show-sql":
+    for migration_file in migration_files:
+        print("\n" + "="*60)
+        print(f"SQL: {migration_file.name}")
+        print("="*60 + "\n")
+        with open(migration_file, 'r', encoding='utf-8') as f:
+            print(f.read())
+        print("\n")
+
+print("\n💡 Run with --show-sql flag to see SQL content")
