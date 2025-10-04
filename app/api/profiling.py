@@ -221,6 +221,8 @@ async def profiling_websocket_endpoint(
 
     # Send current question
     current_question = profiling_agent.get_next_question(session)
+    print(f"DEBUG: Sending first question to {session_id}: {current_question.id if current_question else 'None'}")
+
     if current_question:
         await manager.send_to_session(
             session_id,
