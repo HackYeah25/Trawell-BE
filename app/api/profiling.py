@@ -3,7 +3,7 @@ Profiling API - User profiling with interactive questions and WebSocket support
 """
 import asyncio
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.responses import JSONResponse
@@ -27,7 +27,7 @@ from app.models.profiling import (
     WSProfilingToken,
 )
 from app.agents.profiling_agent import profiling_agent
-from app.services.supabase import get_supabase
+from app.services.supabase_service import get_supabase
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/api/profiling", tags=["profiling"])
