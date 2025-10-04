@@ -43,12 +43,12 @@ class Deal(BaseModel):
 
 class DestinationRecommendation(BaseModel):
     """AI-generated destination recommendation"""
-    recommendation_id: str
-    user_id: str
+    recommendation_id: Optional[str] = None
+    user_id: Optional[str] = None
     destination: DestinationInfo
-    reasoning: str
-    optimal_season: str
-    estimated_budget: float
+    reasoning: Optional[str] = None
+    optimal_season: Optional[str] = None
+    estimated_budget: Optional[float] = None
     currency: str = "USD"
     highlights: List[str] = Field(default_factory=list)
     deals_found: List[Deal] = Field(default_factory=list)
