@@ -89,22 +89,14 @@ class WeatherForecast(BaseModel):
 
 class WeatherRequest(BaseModel):
     """Weather API request parameters"""
-    latitude: float = Field(..., ge=-90, le=90, description="Latitude coordinate")
-    longitude: float = Field(..., ge=-180, le=180, description="Longitude coordinate")
+    city: str = Field(..., description="City name")
     days: int = Field(default=7, ge=1, le=10, description="Number of days to forecast (1-10)")
     
-    @field_validator('latitude')
+    @field_validator('city')
     @classmethod
-    def validate_latitude(cls, v):
-        if not (-90 <= v <= 90):
-            raise ValueError('Latitude must be between -90 and 90')
-        return v
-    
-    @field_validator('longitude')
-    @classmethod
-    def validate_longitude(cls, v):
-        if not (-180 <= v <= 180):
-            raise ValueError('Longitude must be between -180 and 180')
+    def validate_city(cls, v):
+        if not v:
+            raise ValueError('City must be provided')
         return v
 
 

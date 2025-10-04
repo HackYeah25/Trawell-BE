@@ -51,6 +51,7 @@ fastapi-sessions==0.3.2
 # Utilities
 tiktoken==0.5.2  # Token counting for context management
 tenacity==8.2.3  # Retry logic
+unidecode==1.4.0
 
 # Development & Testing
 pytest==7.4.4

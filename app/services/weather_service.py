@@ -5,6 +5,7 @@ import httpx
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+from unidecode import unidecode
 
 from app.config import settings
 
@@ -20,16 +21,13 @@ class WeatherService:
         
     async def get_forecast(
         self, 
-        latitude: float, 
-        longitude: float, 
+        city: str,
         days: int = 7
     ) -> Dict[str, Any]:
         """
         Get weather forecast for specific coordinates
         
         Args:
-            latitude: Latitude coordinate
-            longitude: Longitude coordinate  
             days: Number of days to forecast (1-10)
             
         Returns:
@@ -41,18 +39,13 @@ class WeatherService:
         if not (1 <= days <= 10):
             raise ValueError("Days must be between 1 and 10")
             
-        # Validate coordinates
-        if not (-90 <= latitude <= 90):
-            raise ValueError("Latitude must be between -90 and 90")
-        if not (-180 <= longitude <= 180):
-            raise ValueError("Longitude must be between -180 and 180")
-            
         try:
             async with httpx.AsyncClient() as client:
                 url = f"{self.base_url}/forecast.json"
+                normalized_city = unidecode(city)  
                 params = {
                     "key": self.api_key,
-                    "q": f"{latitude},{longitude}",
+                    "q": f"{normalized_city}",
                     "days": days,
                     "aqi": "yes",  # Air quality index
                     "alerts": "yes"  # Weather alerts
@@ -171,15 +164,13 @@ class WeatherService:
     
     async def get_current_weather(
         self, 
-        latitude: float, 
-        longitude: float
+        city: str
     ) -> Dict[str, Any]:
         """
         Get current weather for specific coordinates
         
         Args:
-            latitude: Latitude coordinate
-            longitude: Longitude coordinate
+            city: City name
             
         Returns:
             Current weather data
@@ -190,9 +181,11 @@ class WeatherService:
         try:
             async with httpx.AsyncClient() as client:
                 url = f"{self.base_url}/current.json"
+                normalized_city = unidecode(city)  
+
                 params = {
                     "key": self.api_key,
-                    "q": f"{latitude},{longitude}",
+                    "q": f"{normalized_city}",
                     "aqi": "yes"
                 }
                 
