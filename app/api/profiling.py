@@ -423,6 +423,9 @@ async def process_sufficient_answer(
         # Save final session state
         await save_session(session)
 
+        # Save session to Supabase database
+        await session_service.save_session_to_database(session_id)
+
         # Extract and save user profile
         user_profile = profiling_agent.extract_user_profile(session)
 
