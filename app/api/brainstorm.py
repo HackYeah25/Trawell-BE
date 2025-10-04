@@ -1,268 +1,182 @@
 """
-Brainstorm module endpoints - Destination discovery
+Brainstorm API - Destination discovery with LangChain context management
 """
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from typing import Dict, Optional
 import uuid
+import asyncio
+import json
 
-from app.models.conversation import Conversation, ConversationCreate, MessageCreate, ConversationResponse, Message, MessageRole
-from app.models.destination import (
-    BrainstormRequest,
-    BrainstormResponse,
-    DestinationRecommendation,
-)
-from app.models.user import TokenData
-from app.services.supabase_service import SupabaseService
-from app.services.langchain_service import LangChainService
-from app.utils.context_manager import ContextManager
-from app.prompts.loader import PromptLoader
-from app.api.deps import (
-    get_current_user,
-    get_supabase_dep,
-    get_langchain_dep,
-    get_context_manager_dep,
-    get_prompt_loader_dep
-)
-from app.services.weather_service import get_weather_service, WeatherService
-from app.services.amadeus_service import AmadeusService
+from app.models.user import UserProfile, UserPreferences, UserConstraints, TokenData
+from app.services.supabase_service import get_supabase
+from app.agents.brainstorm_agent import BrainstormAgent
+from app.api.deps import get_current_user_optional
 
-router = APIRouter()
+router = APIRouter(prefix="/api/brainstorm", tags=["brainstorm"])
+
+# In-memory storage for active agents (in production: use Redis)
+active_agents: Dict[str, BrainstormAgent] = {}
 
 
 @router.post("/start")
 async def start_brainstorm_session(
-    request: BrainstormRequest,
-    current_user: TokenData = Depends(get_current_user),
-    supabase: SupabaseService = Depends(get_supabase_dep)
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
 ):
     """
-    Start a new brainstorming session
-
-    Args:
-        request: Brainstorm request data
-        current_user: Authenticated user
-        supabase: Supabase service
+    Start new brainstorm session with user profile context
 
     Returns:
-        New conversation session
+        session_id, first_message, websocket_url
     """
-    # Create new conversation
-    conversation = Conversation(
-        conversation_id=f"conv_{uuid.uuid4().hex[:12]}",
-        user_id=current_user.user_id,
-        module="brainstorm",
-        mode="group" if request.group_mode else "solo",
-        group_participants=request.group_participants if request.group_mode else []
-    )
+    try:
+        # Generate session ID
+        session_id = f"brainstorm_{uuid.uuid4().hex[:12]}"
 
-    # Save to database
-    created_conversation = await supabase.create_conversation(conversation)
+        # Get user profile
+        supabase = get_supabase()
+        user_id = current_user.user_id if current_user else None
 
-    return {
-        "conversation_id": created_conversation.conversation_id,
-        "mode": created_conversation.mode,
-        "message": "Brainstorm session started! Tell me what kind of trip you're dreaming about."
-    }
-
-
-@router.post("/{conversation_id}/message", response_model=ConversationResponse)
-async def send_message(
-    conversation_id: str,
-    message: str,
-    current_user: TokenData = Depends(get_current_user),
-    supabase: SupabaseService = Depends(get_supabase_dep),
-    langchain: LangChainService = Depends(get_langchain_dep),
-    context_mgr: ContextManager = Depends(get_context_manager_dep),
-    prompts: PromptLoader = Depends(get_prompt_loader_dep)
-):
-    """
-    Send a message in a brainstorm session
-
-    Args:
-        conversation_id: Conversation ID
-        message: User message
-        current_user: Authenticated user
-        supabase: Supabase service
-        langchain: LangChain service
-        context_mgr: Context manager
-        prompts: Prompt loader
-
-    Returns:
-        Conversation response with AI reply
-    """
-    # Get conversation
-    conversation = await supabase.get_conversation(conversation_id)
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    # Get user profile
-    user_profile = await supabase.get_user_profile(current_user.user_id)
-    if not user_profile:
-        raise HTTPException(status_code=404, detail="User profile not found")
-
-    # Create user message
-    user_message = Message(
-        role=MessageRole.USER,
-        content=message
-    )
-
-    # Add to conversation
-    conversation = await supabase.add_message(conversation_id, user_message)
-
-    # Build context with user profile
-    system_prompt = prompts.load("brainstorm", "destination_discovery_system")
-    context = context_mgr.build_conversation_context(
-        user_profile=user_profile,
-        conversation_history=conversation.messages,
-        system_prompt=system_prompt
-    )
-
-    # Get AI response
-    ai_response_text = await langchain.chat(context)
-
-    # Create AI message
-    ai_message = Message(
-        role=MessageRole.ASSISTANT,
-        content=ai_response_text
-    )
-
-    # Add AI response to conversation
-    await supabase.add_message(conversation_id, ai_message)
-
-    return ConversationResponse(
-        conversation_id=conversation_id,
-        message=user_message,
-        ai_response=ai_message
-    )
-
-
-@router.get("/recommendations")
-async def get_recommendations(
-    current_user: TokenData = Depends(get_current_user),
-    supabase: SupabaseService = Depends(get_supabase_dep),
-    weather_service: WeatherService = Depends(get_weather_service),
-    origin: str = None,
-    weather_days: int = 7,
-):
-    """
-    Get destination recommendations for the current user, optionally enriched
-    with weather forecasts and flight inspiration data.
-
-    Returns:
-        Object containing recommendations and optional extras
-    """
-    recommendations = await supabase.get_user_recommendations(current_user.user_id)
-
-    extras: Dict[str, Any] = {}
-
-    weather_by_recommendation: Dict[str, Any] = {}
-    for rec in recommendations:
-        try:
-            name = getattr(rec.destination, "name", None)
-            if not name:
-                raise ValueError("destination.name is required for weather lookup")
-
-            weather = await weather_service.get_forecast(
-                city=name,
-                days=max(1, min(weather_days, 10)),
+        if not user_id:
+            # Testing without auth - use test profile
+            print("WARNING: No user_id, using test profile for development")
+            user_profile = UserProfile(
+                user_id="test_user",
+                preferences=UserPreferences(
+                    traveler_type="explorer",
+                    activity_level="high",
+                    environment="mixed",
+                    accommodation_style="boutique",
+                    budget_sensitivity="medium",
+                    culture_interest="high",
+                    food_importance="high"
+                ),
+                constraints=UserConstraints(
+                    dietary_restrictions=[],
+                    climate_preferences=["mild_temperate", "hot_tropical"],
+                    language_preferences=[]
+                ),
+                wishlist_regions=["Southeast Asia", "Iceland"],
+                past_destinations=["Paris", "Barcelona"]
             )
-            weather_by_recommendation[rec.recommendation_id] = weather
-        except Exception as e:
-            weather_by_recommendation[rec.recommendation_id] = {
-                "error": str(e)
-            }
-    extras["weather_by_recommendation"] = weather_by_recommendation
+        else:
+            # Get real profile from database
+            user_profile = await supabase.get_user_profile(user_id)
+            if not user_profile:
+                raise HTTPException(
+                    status_code=404,
+                    detail="User profile not found. Complete onboarding first."
+                )
 
-    if not origin:
-        extras["flight_inspiration"] = {
-            "error": "origin is required (IATA code, e.g., JFK)"
+        print(f"DEBUG: Starting brainstorm session {session_id}")
+
+        # Create agent with full user context
+        agent = BrainstormAgent(user_profile)
+        active_agents[session_id] = agent
+
+        # Generate personalized first message
+        first_message = agent.generate_first_message()
+
+        return {
+            "session_id": session_id,
+            "first_message": first_message,
+            "websocket_url": f"/api/brainstorm/ws/{session_id}"
         }
-    else:
-        try:
-            amadeus = AmadeusService(test_mode=True)
-            flights = await amadeus.search_flight_destinations(origin=origin, max_results=20)
-            extras["flight_inspiration"] = {
-                "origin": origin,
-                "data": flights.get("data", [])
-            }
-        except Exception as e:
-            extras["flight_inspiration"] = {"origin": origin, "error": str(e)}
+    except Exception as e:
+        print(f"ERROR in start_brainstorm_session: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.websocket("/ws/{session_id}")
+async def brainstorm_websocket(
+    websocket: WebSocket,
+    session_id: str
+):
+    """
+    WebSocket endpoint for real-time brainstorm conversation
+    Streams responses token by token
+    """
+    # Check if session exists
+    if session_id not in active_agents:
+        await websocket.accept()
+        await websocket.close(code=1008, reason="Session not found")
+        return
+
+    agent = active_agents[session_id]
+
+    await websocket.accept()
+    print(f"DEBUG: WebSocket connected for session {session_id}")
+
+    try:
+        while True:
+            # Receive message from user
+            data = await websocket.receive_json()
+
+            if data.get("type") == "message":
+                user_message = data.get("content")
+                print(f"DEBUG: Received message: {user_message[:50]}...")
+
+                # Send thinking indicator
+                await websocket.send_json({
+                    "type": "thinking",
+                    "session_id": session_id
+                })
+
+                # Stream response from agent
+                full_response = ""
+                async for token in agent.chat(user_message):
+                    full_response += token
+                    await websocket.send_json({
+                        "type": "token",
+                        "session_id": session_id,
+                        "token": token
+                    })
+                    await asyncio.sleep(0.01)  # Small delay for smooth UX
+
+                # Send complete message
+                await websocket.send_json({
+                    "type": "message",
+                    "session_id": session_id,
+                    "role": "assistant",
+                    "content": full_response
+                })
+
+                print(f"DEBUG: Sent response, length: {len(full_response)}")
+
+    except WebSocketDisconnect:
+        print(f"DEBUG: WebSocket disconnected for session {session_id}")
+        # Keep agent in memory for reconnection
+    except Exception as e:
+        print(f"ERROR: WebSocket error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@router.get("/session/{session_id}/history")
+async def get_conversation_history(session_id: str):
+    """Get conversation history for a session"""
+    if session_id not in active_agents:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    agent = active_agents[session_id]
+    history = agent.get_conversation_history()
 
     return {
-        "recommendations": recommendations,
-        "extras": extras,
+        "session_id": session_id,
+        "messages": history,
+        "message_count": len(history)
     }
 
 
-@router.post("/recommendations", response_model=DestinationRecommendation)
-async def create_recommendation(
-    payload: DestinationRecommendation,
-    current_user: TokenData = Depends(get_current_user),
-    supabase: SupabaseService = Depends(get_supabase_dep)
-):
-    """
-    Create a destination recommendation for the current user
-    """
-    rec = DestinationRecommendation(
-        recommendation_id=payload.recommendation_id or f"rec_{uuid.uuid4().hex[:12]}",
-        user_id=payload.user_id or current_user.user_id,
-        destination=payload.destination,
-        reasoning=payload.reasoning or "",
-        optimal_season=payload.optimal_season or "",
-        estimated_budget=payload.estimated_budget or 0.0,
-        currency=payload.currency,
-        highlights=payload.highlights,
-        deals_found=payload.deals_found,
-        confidence_score=payload.confidence_score,
-    )
-    return await supabase.save_recommendation(rec)
+@router.delete("/session/{session_id}")
+async def end_session(session_id: str):
+    """End brainstorm session and clear memory"""
+    if session_id not in active_agents:
+        raise HTTPException(status_code=404, detail="Session not found")
 
+    # Clean up
+    del active_agents[session_id]
+    print(f"DEBUG: Session {session_id} ended and cleaned up")
 
-@router.get("/{conversation_id}/suggestions")
-async def get_suggestions(
-    conversation_id: str,
-    current_user: TokenData = Depends(get_current_user),
-    supabase: SupabaseService = Depends(get_supabase_dep)
-):
-    """
-    Get AI destination suggestions for a brainstorm session
-
-    Args:
-        conversation_id: Conversation ID
-        current_user: Authenticated user
-        supabase: Supabase service
-
-    Returns:
-        List of destination suggestions
-    """
-    # TODO: Implement suggestion generation logic
-    raise HTTPException(
-        status_code=501,
-        detail="Suggestions endpoint not yet implemented"
-    )
-
-
-@router.post("/{conversation_id}/group/invite")
-async def invite_to_group(
-    conversation_id: str,
-    user_ids: List[str],
-    current_user: TokenData = Depends(get_current_user),
-    supabase: SupabaseService = Depends(get_supabase_dep)
-):
-    """
-    Invite users to a group brainstorm session
-
-    Args:
-        conversation_id: Conversation ID
-        user_ids: List of user IDs to invite
-        current_user: Authenticated user
-        supabase: Supabase service
-
-    Returns:
-        Updated conversation
-    """
-    # TODO: Implement group invitation logic
-    raise HTTPException(
-        status_code=501,
-        detail="Group invitation endpoint not yet implemented"
-    )
+    return {"message": "Session ended successfully"}

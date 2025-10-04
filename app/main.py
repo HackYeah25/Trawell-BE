@@ -165,7 +165,7 @@ async def health_check():
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(profiling.router, tags=["Profiling"])
-app.include_router(brainstorm.router, prefix="/api/brainstorm", tags=["Brainstorm"])
+app.include_router(brainstorm.router, tags=["Brainstorm"])  # Router already has /api/brainstorm prefix
 app.include_router(group_brainstorm.router, tags=["Group Brainstorm"])
 app.include_router(planning.router, prefix="/api/planning", tags=["Planning"])
 app.include_router(support.router, prefix="/api/support", tags=["Support"])
