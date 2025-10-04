@@ -38,7 +38,7 @@ class SupabaseService:
 
     # User Profile Operations
     async def get_user(self, user_id: str) -> Optional[User]:
-        """Fetch user by id from 'users' table and map to User model."""
+        """Fetch user and map to API User: {id, name, email?, onboardingCompleted}."""
         if not self.client:
             raise Exception("Supabase client not initialized")
         try:
@@ -50,25 +50,20 @@ class SupabaseService:
             raise Exception(f"Error fetching user: {str(e)}")
 
     async def update_user(self, user_id: str, fields: Dict[str, Any]) -> User:
-        """Update allowed user fields and updated_at; returns updated User.
-
-        Allowed fields: email, username, full_name, is_active, is_verified
-        """
+        """Update user with whatever fields are provided; returns updated User."""
         if not self.client:
             raise Exception("Supabase client not initialized")
         try:
-            allowed = {k: v for k, v in fields.items() if k in {
-                "email", "username", "full_name", "is_active", "is_verified"
-            } and v is not None}
+            update_payload: Dict[str, Any] = {k: v for k, v in fields.items() if v is not None}
 
-            if not allowed:
+            if not update_payload:
                 user = await self.get_user(user_id)
                 if not user:
                     raise Exception("User not found")
                 return user
 
-            allowed["updated_at"] = datetime.utcnow().isoformat()
-            self.client.table("users").update(allowed).eq("id", user_id).execute()
+            update_payload["updated_at"] = datetime.utcnow().isoformat()
+            self.client.table("users").update(update_payload).eq("id", user_id).execute()
 
             user = await self.get_user(user_id)
             if not user:

@@ -94,15 +94,11 @@ class UserProfile(BaseModel):
 
 
 class User(BaseModel):
-    """User account model"""
+    """API User model aligned with frontend needs and Supabase schema"""
     id: Optional[str] = None
-    email: EmailStr
-    username: str
-    full_name: Optional[str] = None
-    is_active: bool = True
-    is_verified: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    onboardingCompleted: bool = False
 
 
 class UserCreate(BaseModel):
