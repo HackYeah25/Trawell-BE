@@ -25,7 +25,7 @@ from app.models.group_conversation import (
     WSCompatibilityUpdate,
     ConversationStatus,
 )
-from app.services.supabase import supabase_client
+from app.services.supabase import get_supabase
 from app.agents.group_moderator import group_moderator
 from app.api.deps import get_current_user
 
@@ -80,7 +80,7 @@ manager = GroupConnectionManager()
 # Helper functions for Supabase operations
 async def create_conversation(room_code: str) -> GroupConversation:
     """Create a new group conversation"""
-    result = supabase_client.table("group_conversations").insert(
+    result = get_supabase().client.table("group_conversations").insert(
         {
             "room_code": room_code,
             "status": ConversationStatus.PROFILING.value,
@@ -97,7 +97,7 @@ async def create_conversation(room_code: str) -> GroupConversation:
 
 async def get_conversation_by_room_code(room_code: str) -> Optional[GroupConversation]:
     """Get conversation by room code"""
-    result = supabase_client.table("group_conversations").select("*").eq(
+    result = get_supabase().client.table("group_conversations").select("*").eq(
         "room_code", room_code
     ).execute()
 
@@ -109,7 +109,7 @@ async def get_conversation_by_room_code(room_code: str) -> Optional[GroupConvers
 
 async def get_conversation(conversation_id: str) -> Optional[GroupConversation]:
     """Get conversation by ID"""
-    result = supabase_client.table("group_conversations").select("*").eq(
+    result = get_supabase().client.table("group_conversations").select("*").eq(
         "id", conversation_id
     ).execute()
 
@@ -126,7 +126,7 @@ async def add_participant(
     user_profile: dict,
 ) -> GroupParticipant:
     """Add participant to conversation"""
-    result = supabase_client.table("group_participants").insert(
+    result = get_supabase().client.table("group_participants").insert(
         {
             "conversation_id": conversation_id,
             "user_id": user_id,
@@ -144,7 +144,7 @@ async def add_participant(
 
 async def get_participants(conversation_id: str) -> List[GroupParticipant]:
     """Get all active participants in conversation"""
-    result = supabase_client.table("group_participants").select("*").eq(
+    result = get_supabase().client.table("group_participants").select("*").eq(
         "conversation_id", conversation_id
     ).eq("is_active", True).execute()
 
@@ -153,7 +153,7 @@ async def get_participants(conversation_id: str) -> List[GroupParticipant]:
 
 async def get_messages(conversation_id: str, limit: int = 50) -> List[GroupMessage]:
     """Get recent messages from conversation"""
-    result = supabase_client.table("group_messages").select("*").eq(
+    result = get_supabase().client.table("group_messages").select("*").eq(
         "conversation_id", conversation_id
     ).order("created_at", desc=True).limit(limit).execute()
 
@@ -170,7 +170,7 @@ async def add_message(
     metadata: Optional[dict] = None,
 ) -> GroupMessage:
     """Add message to conversation"""
-    result = supabase_client.table("group_messages").insert(
+    result = get_supabase().client.table("group_messages").insert(
         {
             "conversation_id": conversation_id,
             "user_id": user_id,
@@ -191,7 +191,7 @@ async def update_conversation_compatibility(
     conversation_id: str, compatibility_data: dict, status: ConversationStatus
 ):
     """Update conversation with compatibility analysis"""
-    supabase_client.table("group_conversations").update(
+    get_supabase().client.table("group_conversations").update(
         {
             "compatibility_data": compatibility_data,
             "status": status.value,
