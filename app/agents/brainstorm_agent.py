@@ -4,6 +4,10 @@ Uses LangChain with ConversationBufferMemory for context preservation
 """
 from typing import List, Dict, Any, Optional, AsyncIterator
 from datetime import datetime
+from uuid import uuid4
+
+import supabase
+
 
 from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
@@ -12,6 +16,10 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 
 from app.models.user import UserProfile
+from app.models.destination import DestinationRecommendation , DestinationInfo , Rating
+
+from app.services.supabase_service import get_supabase
+
 from app.config import settings
 
 
@@ -26,6 +34,7 @@ class BrainstormAgent:
             user_profile: Complete user profile from profiling
         """
         self.user_profile = user_profile
+        self.supabase = get_supabase()
 
         # Initialize LLM
         # Note: gpt-4o-search-preview does not support temperature/top_p/n parameters
@@ -196,6 +205,35 @@ Current date: {datetime.now().strftime('%Y-%m-%d')}
             elif isinstance(message, AIMessage):
                 history.append({"role": "assistant", "content": message.content})
         return history
+
+    def create_recommendation(self) -> DestinationRecommendation:
+        """Get recommendation for a session"""
+        recommendation = DestinationRecommendation(
+            recommendation_id=uuid4(),
+            user_id=self.user_profile.user_id,
+            destination=DestinationInfo(
+                name="",
+                country="",
+                region="",
+                coordinates=None,
+                description=None
+            ),
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        ret_recommendation = self.supabase.create_recommendation(recommendation)
+        return ret_recommendation
+
+    def get_recommendation(self, recommendation_id: str) -> DestinationRecommendation:
+        """Get recommendation for a session"""
+        recommendation_list = self.supabase.get_user_recommendations(self.user_profile.user_id)
+        recommendation = list(filter(lambda x: x.recommendation_id == recommendation_id, recommendation_list))[0]
+        return recommendation
+    
+    def update_recommendation(self, recommendation_id: str, rating: Rating):
+        """Update recommendation for a session"""
+        recommendation = self.supabase.update_recommendation(recommendation_id, rating)
+        return recommendation
 
     def clear_memory(self):
         """Clear conversation memory"""

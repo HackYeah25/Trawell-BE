@@ -8,6 +8,8 @@ import asyncio
 import json
 
 from app.models.user import UserProfile, UserPreferences, UserConstraints, TokenData
+from app.models.destination import Rating
+
 from app.services.supabase_service import get_supabase
 from app.agents.brainstorm_agent import BrainstormAgent
 from app.api.deps import get_current_user_optional
@@ -180,3 +182,36 @@ async def end_session(session_id: str):
     print(f"DEBUG: Session {session_id} ended and cleaned up")
 
     return {"message": "Session ended successfully"}
+
+@router.post("/session/{session_id}/create_recommendation")
+async def create_recommendation(session_id: str):
+    """Create recommendation for a session"""
+    if session_id not in active_agents:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    agent = active_agents[session_id]
+    recommendation = agent.create_recommendation()
+    return recommendation
+
+@router.get("/session/{session_id}/recommendation")
+async def get_recommendation(session_id: str):
+    """Get recommendation for a session"""
+    if session_id not in active_agents:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    agent = active_agents[session_id]
+    recommendation = agent.get_recommendation()
+    return recommendation
+
+@router.post("/session/{session_id}/recommendation/{recommendation_id}")
+async def update_recommendation(
+    session_id: str,
+    recommendation_id: str, 
+    rating: Rating):
+    """Update recommendation for a session"""
+    if session_id not in active_agents:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    agent = active_agents[session_id]
+    recommendation = agent.update_recommendation(recommendation_id, rating)
+    return recommendation

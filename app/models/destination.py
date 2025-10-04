@@ -3,6 +3,7 @@ Destination and recommendation data models
 """
 from datetime import datetime
 from typing import List, Optional, Dict, Any
+from uuid import UUID
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -94,7 +95,7 @@ class DestinationDetails(BaseModel):
 
 class DestinationRecommendation(BaseModel):
     """AI-generated destination recommendation"""
-    recommendation_id: Optional[str] = None
+    recommendation_id: UUID
     user_id: str
     destination: DestinationInfo
     rating: Optional[Rating] = None

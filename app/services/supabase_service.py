@@ -10,7 +10,7 @@ from postgrest.exceptions import APIError
 from app.config import settings
 from app.models.user import UserProfile, User
 from app.models.conversation import Conversation, Message
-from app.models.destination import DestinationRecommendation
+from app.models.destination import DestinationRecommendation, Rating
 from app.models.trip import TripPlan
 
 
@@ -121,7 +121,7 @@ class SupabaseService:
             raise Exception(f"Error fetching user conversations: {str(e)}")
 
     # Destination Recommendation Operations
-    async def save_recommendation(self, recommendation: DestinationRecommendation) -> DestinationRecommendation:
+    async def create_recommendation(self, recommendation: DestinationRecommendation) -> DestinationRecommendation:
         """Save destination recommendation"""
         try:
             data = recommendation.model_dump(mode="json")
@@ -138,11 +138,11 @@ class SupabaseService:
         except Exception as e:
             raise Exception(f"Error fetching recommendations: {str(e)}")
 
-    async def update_recommendation_status(self, recommendation_id: str, status: str) -> DestinationRecommendation:
+    async def update_recommendation(self, recommendation_id: str, rating: Rating) -> DestinationRecommendation:
         """Update recommendation status"""
         try:
             response = self.client.table("destination_recommendations").update({
-                "status": status,
+                "rating": rating,
                 "updated_at": datetime.utcnow().isoformat()
             }).eq("recommendation_id", recommendation_id).execute()
             return DestinationRecommendation(**response.data[0])
