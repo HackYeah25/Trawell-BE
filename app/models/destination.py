@@ -12,6 +12,29 @@ class RecommendationStatus(str, Enum):
     DETAILS_GENERATED = "details_generated"
     DETAILS_COMPLETED = "details_completed"
 
+class Rating(str, Enum):
+    ONE_STAR = "1"
+    TWO_STARS = "2"
+    THREE_STARS = "3"
+
+class DealType(str, Enum):
+    """Types of deals available"""
+    FLIGHT = "flight"
+    HOTEL = "hotel"
+    PACKAGE = "package"
+    TRANSPORT = "transport"
+
+class ActivityCategory(str, Enum):
+    """Categories of activities"""
+    CULTURAL = "cultural"
+    OUTDOOR = "outdoor"
+    FOOD = "food"
+    ENTERTAINMENT = "entertainment"
+    SHOPPING = "shopping"
+    RELAXATION = "relaxation"
+    ADVENTURE = "adventure"
+    HISTORICAL = "historical"
+
 class Coordinates(BaseModel):
     """Geographic coordinates"""
     lat: float
@@ -28,16 +51,18 @@ class DestinationInfo(BaseModel):
 
 class Deal(BaseModel):
     """Flight or accommodation deal"""
+    deal_id: str
     type: str  # "flight", "hotel", "package"
     price: float
     currency: str = "USD"
     provider: str
+    highlighted: bool = False
     valid_from: datetime
     valid_until: datetime
     url: Optional[str] = None
     details: Dict[str, Any] = Field(default_factory=dict)
 
-class WeatherInforamtion(BaseModel):
+class WeatherInformation(BaseModel):
     """Weather information"""
     temperature: float
     weather_description: str
@@ -49,6 +74,7 @@ class Activity(BaseModel):
     """Activity"""
     name: str
     description: str
+    category: ActivityCategory = Field(..., description="Activity category")
     location: Optional[Coordinates] = None
     highlighted: bool = False
     url: Optional[str] = None
@@ -57,8 +83,8 @@ class Activity(BaseModel):
 class DestinationDetails(BaseModel):
     """Destination details"""
     reasoning: str
-    weather: WeatherInforamtion
-    estimated_cost: float
+    weather: Optional[WeatherInformation] = None
+    estimated_cost: Optional[float] = None # null when no deals found
     currency: str = "USD"
     deals_found: List[Deal] = Field(default_factory=list)
     activities: List[Activity] = Field(default_factory=list)
@@ -69,8 +95,9 @@ class DestinationDetails(BaseModel):
 class DestinationRecommendation(BaseModel):
     """AI-generated destination recommendation"""
     recommendation_id: Optional[str] = None
-    user_id: Optional[str] = None
+    user_id: str
     destination: DestinationInfo
+    rating: Optional[Rating] = None
     details: Optional[DestinationDetails] = None # this is filled when we want to go there
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
