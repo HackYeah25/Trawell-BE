@@ -22,14 +22,25 @@ class SupabaseService:
 
     def init(self):
         """Initialize Supabase client"""
-        self.client = create_client(
-            settings.supabase_url,
-            settings.supabase_key
-        )
+        try:
+            if not settings.supabase_url or settings.supabase_url == "your_supabase_url_here":
+                print("WARNING: Supabase not configured, skipping initialization")
+                return
+
+            self.client = create_client(
+                settings.supabase_url,
+                settings.supabase_key
+            )
+            print("Supabase client initialized successfully")
+        except Exception as e:
+            print(f"WARNING: Failed to initialize Supabase client: {e}")
+            self.client = None
 
     # User Profile Operations
     async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
         """Fetch user profile by user_id"""
+        if not self.client:
+            raise Exception("Supabase client not initialized")
         try:
             response = self.client.table("user_profiles").select("*").eq("user_id", user_id).execute()
             if response.data:
@@ -40,6 +51,8 @@ class SupabaseService:
 
     async def create_user_profile(self, profile: UserProfile) -> UserProfile:
         """Create new user profile"""
+        if not self.client:
+            raise Exception("Supabase client not initialized")
         try:
             data = profile.model_dump(mode="json")
             response = self.client.table("user_profiles").insert(data).execute()
