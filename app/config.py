@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
 
     # External APIs
+    amadeus_api_key: str = Field(default="", description="Amadeus API key")
+    amadeus_api_secret: str = Field(default="", description="Amadeus API secret")
     skyscanner_api_key: str = Field(default="", description="Skyscanner API key")
     weather_api_key: str = Field(default="", description="Weather API key")
     google_maps_api_key: str = Field(default="", description="Google Maps API key")
