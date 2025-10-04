@@ -439,7 +439,11 @@ async def process_sufficient_answer(
         supabase = get_supabase()
         if supabase.client and session.user_id:
             try:
-                await supabase.create_user_profile(user_profile)
+                existing = await supabase.get_user_profile(session.user_id)
+                if existing:
+                    await supabase.update_user_profile(session.user_id, user_profile)
+                else:
+                    await supabase.create_user_profile(user_profile)
             except Exception as e:
                 print(f"Error saving profile: {e}")
 
