@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.api import auth, brainstorm, planning, support, websocket
+from app.api import auth, brainstorm, planning, support, websocket, group_brainstorm
 
 # Configure logging
 logging.basicConfig(
@@ -86,6 +86,10 @@ app = FastAPI(
             "description": "Destination discovery and brainstorming sessions. Start here to find your perfect destination!"
         },
         {
+            "name": "Group Brainstorm",
+            "description": "Collaborative group travel planning with AI moderation and conflict resolution"
+        },
+        {
             "name": "Planning",
             "description": "Trip planning endpoints - flights, weather, POIs, events, and itinerary"
         },
@@ -157,6 +161,7 @@ async def health_check():
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(brainstorm.router, prefix="/api/brainstorm", tags=["Brainstorm"])
+app.include_router(group_brainstorm.router, tags=["Group Brainstorm"])
 app.include_router(planning.router, prefix="/api/planning", tags=["Planning"])
 app.include_router(support.router, prefix="/api/support", tags=["Support"])
 app.include_router(websocket.router, prefix="/api/ws", tags=["WebSocket"])

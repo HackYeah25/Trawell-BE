@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Travel Planning - AI Moderator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .room-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .room-code {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .compatibility-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        .compat-high { background: #10b981; color: white; }
+        .compat-medium { background: #f59e0b; color: white; }
+        .compat-low { background: #ef4444; color: white; }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+
+        .participants {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+
+        .participant {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f3f4f6;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .participant-name {
+            font-weight: 600;
+        }
+
+        .participant-score {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            text-align: left;
+        }
+
+        .message.ai {
+            text-align: left;
+            background: #f0f9ff;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .message.system {
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .message-header {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #667eea;
+        }
+
+        .message-content {
+            color: #1f2937;
+            line-height: 1.5;
+        }
+
+        .thinking {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #667eea;
+            font-style: italic;
+        }
+
+        .thinking-dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .thinking-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .thinking-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .thinking-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .input-container {
+            padding: 20px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 10px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .message-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-button, .ask-ai-button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .send-button {
+            background: #667eea;
+            color: white;
+        }
+
+        .send-button:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .ask-ai-button {
+            background: #10b981;
+            color: white;
+        }
+
+        .ask-ai-button:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .join-form {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin: 100px auto;
+        }
+
+        .join-form h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .join-button {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .join-button:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- Join Form (shown initially) -->
+        <div class="join-form" id="joinForm">
+            <h2>🌍 Join Group Travel Planning</h2>
+
+            <div class="form-group">
+                <label>Room Code (leave empty to create new)</label>
+                <input type="text" id="roomCode" placeholder="ABC123" maxlength="10">
+            </div>
+
+            <div class="form-group">
+                <label>Your Name</label>
+                <input type="text" id="userName" placeholder="Enter your name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Travel Style</label>
+                <select id="travelerType">
+                    <option value="explorer">Explorer (adventure seeker)</option>
+                    <option value="relaxer">Relaxer (beach & chill)</option>
+                    <option value="culture_seeker">Culture Seeker (museums & history)</option>
+                    <option value="foodie">Foodie (culinary experiences)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Activity Level</label>
+                <select id="activityLevel">
+                    <option value="high">High (very active)</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="low">Low (relaxed pace)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Preferred Environment</label>
+                <select id="environment">
+                    <option value="urban">Urban (cities)</option>
+                    <option value="nature">Nature (outdoors)</option>
+                    <option value="beach">Beach</option>
+                    <option value="mountains">Mountains</option>
+                </select>
+            </div>
+
+            <button class="join-button" onclick="joinConversation()">Join / Create Room</button>
+        </div>
+
+        <!-- Main Chat Interface (hidden initially) -->
+        <div id="chatInterface" style="display: none;">
+            <div class="header">
+                <div class="room-info">
+                    <div>
+                        <div class="room-code" id="displayRoomCode">Room: ---</div>
+                        <div style="color: #6b7280; margin-top: 4px;">Share this code with friends!</div>
+                    </div>
+                    <div>
+                        <span class="compatibility-badge compat-medium" id="compatBadge">Analyzing...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <div class="participants">
+                    <h3 style="margin-bottom: 16px;">Participants</h3>
+                    <div id="participantList"></div>
+                </div>
+
+                <div class="chat-container">
+                    <div class="messages" id="messages"></div>
+                    <div class="input-container">
+                        <input
+                            type="text"
+                            class="message-input"
+                            id="messageInput"
+                            placeholder="Share your travel preferences..."
+                            onkeypress="if(event.key === 'Enter') sendMessage()"
+                        >
+                        <button class="send-button" onclick="sendMessage()">Send</button>
+                        <button class="ask-ai-button" onclick="askAI()">Ask AI</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let ws = null;
+        let conversationId = null;
+        let userId = null;
+        let userName = null;
+
+        async function joinConversation() {
+            const roomCode = document.getElementById('roomCode').value.trim();
+            userName = document.getElementById('userName').value.trim();
+
+            if (!userName) {
+                alert('Please enter your name');
+                return;
+            }
+
+            const userProfile = {
+                traveler_type: document.getElementById('travelerType').value,
+                activity_level: document.getElementById('activityLevel').value,
+                environment: document.getElementById('environment').value,
+            };
+
+            try {
+                let response;
+
+                if (roomCode) {
+                    // Join existing conversation
+                    response = await fetch(`${API_BASE}/api/brainstorm/group/join`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            room_code: roomCode,
+                            user_name: userName,
+                            user_profile: userProfile
+                        })
+                    });
+                } else {
+                    // Create new conversation
+                    response = await fetch(`${API_BASE}/api/brainstorm/group/create`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_name: userName,
+                            user_profile: userProfile
+                        })
+                    });
+                }
+
+                const data = await response.json();
+
+                conversationId = data.conversation.id;
+                document.getElementById('displayRoomCode').textContent = `Room: ${data.conversation.room_code}`;
+
+                // Show chat interface
+                document.getElementById('joinForm').style.display = 'none';
+                document.getElementById('chatInterface').style.display = 'block';
+
+                // Update participants
+                updateParticipants(data.participants);
+
+                // Display existing messages
+                data.recent_messages.forEach(msg => displayMessage(msg));
+
+                // Connect WebSocket
+                connectWebSocket();
+            } catch (error) {
+                console.error('Error joining conversation:', error);
+                alert('Failed to join conversation');
+            }
+        }
+
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://localhost:8000/api/brainstorm/group/ws/${conversationId}?user_name=${encodeURIComponent(userName)}`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+            };
+        }
+
+        function handleWebSocketMessage(data) {
+            switch(data.type) {
+                case 'user_message':
+                    displayMessage({
+                        user_name: data.user_name,
+                        message: data.message,
+                        message_type: 'user'
+                    });
+                    break;
+
+                case 'ai_thinking':
+                    displayThinking();
+                    break;
+
+                case 'ai_token':
+                    appendToken(data.token);
+                    break;
+
+                case 'ai_message':
+                    completeAIMessage(data.message);
+                    break;
+
+                case 'system_message':
+                    displayMessage({
+                        message: data.message,
+                        message_type: 'system'
+                    });
+                    break;
+
+                case 'compatibility_update':
+                    updateCompatibility(data.analysis);
+                    break;
+
+                case 'participant_update':
+                    if (data.action === 'joined') {
+                        addParticipant(data.participant);
+                    }
+                    break;
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+
+            if (!message || !ws) return;
+
+            ws.send(JSON.stringify({
+                type: 'user_message',
+                message: message,
+                ai_invoked: false
+            }));
+
+            input.value = '';
+        }
+
+        function askAI() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim() || "What do you suggest?";
+
+            if (!ws) return;
+
+            ws.send(JSON.stringify({
+                type: 'user_message',
+                message: message,
+                ai_invoked: true
+            }));
+
+            input.value = '';
+        }
+
+        function displayMessage(msg) {
+            const messagesDiv = document.getElementById('messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${msg.message_type || 'user'}`;
+
+            if (msg.message_type === 'system') {
+                msgDiv.innerHTML = msg.message;
+            } else if (msg.message_type === 'ai_suggestion' || msg.message_type === 'ai_analysis') {
+                msgDiv.innerHTML = `
+                    <div class="message-header">🤖 AI Assistant</div>
+                    <div class="message-content">${msg.message}</div>
+                `;
+            } else {
+                msgDiv.innerHTML = `
+                    <div class="message-header">${msg.user_name || 'User'}</div>
+                    <div class="message-content">${msg.message}</div>
+                `;
+            }
+
+            messagesDiv.appendChild(msgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        let currentAIMessage = null;
+
+        function displayThinking() {
+            const messagesDiv = document.getElementById('messages');
+            currentAIMessage = document.createElement('div');
+            currentAIMessage.className = 'message ai';
+            currentAIMessage.innerHTML = `
+                <div class="thinking">
+                    💭 <span>Analyzing everyone's preferences</span>
+                    <div class="thinking-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            messagesDiv.appendChild(currentAIMessage);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function appendToken(token) {
+            if (!currentAIMessage) {
+                currentAIMessage = document.createElement('div');
+                currentAIMessage.className = 'message ai';
+                currentAIMessage.innerHTML = `
+                    <div class="message-header">🤖 AI Assistant</div>
+                    <div class="message-content"></div>
+                `;
+                document.getElementById('messages').appendChild(currentAIMessage);
+            }
+
+            const contentDiv = currentAIMessage.querySelector('.message-content');
+            if (contentDiv) {
+                contentDiv.textContent += token;
+            }
+
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+
+        function completeAIMessage(message) {
+            currentAIMessage = null;
+        }
+
+        function updateParticipants(participants) {
+            const list = document.getElementById('participantList');
+            list.innerHTML = participants.map(p => `
+                <div class="participant">
+                    <span class="participant-name">${p.user_name}</span>
+                    <span class="participant-score">${p.compatibility_score ? (p.compatibility_score * 100).toFixed(0) + '%' : '...'}</span>
+                </div>
+            `).join('');
+        }
+
+        function addParticipant(participant) {
+            const list = document.getElementById('participantList');
+            const div = document.createElement('div');
+            div.className = 'participant';
+            div.innerHTML = `
+                <span class="participant-name">${participant.user_name}</span>
+                <span class="participant-score">...</span>
+            `;
+            list.appendChild(div);
+        }
+
+        function updateCompatibility(analysis) {
+            const badge = document.getElementById('compatBadge');
+            badge.className = `compatibility-badge compat-${analysis.compatibility_level}`;
+            badge.textContent = `${analysis.compatibility_level} compatibility`;
+        }
+    </script>
+</body>
+</html>
