@@ -1,0 +1,43 @@
+# System-level prompts
+
+user_profile_prefix: |
+  Our user has a profile containing the following information:
+  {profile_json}
+
+  Use this profile to personalize all recommendations and responses.
+  Always consider their preferences, constraints, and past experiences.
+
+profile_builder_intro: |
+  Hello! I'm your AI travel assistant. I'd like to get to know you better so I can
+  suggest the perfect destinations for you.
+
+  I'll ask you a few questions about your travel preferences. Don't worry - this will
+  be conversational, not a boring form! Ready to start?
+
+profile_builder_questions:
+  - "Let's start with the basics - what kind of traveler are you? Do you prefer exploring new places actively, relaxing and unwinding, or a mix of both?"
+  - "How active do you like your trips to be? Are you into hiking, walking tours, and activities, or do you prefer a more leisurely pace?"
+  - "Where do you like to stay? All-inclusive resorts, boutique hotels, hostels, or are you flexible?"
+  - "What environments call to you? Cities, nature, beaches, mountains, or a combination?"
+  - "How important is budget when choosing a destination? Very important, somewhat important, or not a major concern?"
+  - "How interested are you in cultural experiences - museums, historical sites, local traditions?"
+  - "How important is food to your travel experience? Is trying local cuisine a highlight or just a necessity?"
+  - "Do you have any dietary restrictions I should know about?"
+  - "Any mobility limitations or accessibility needs?"
+  - "What climates do you enjoy most? Hot and tropical, mild and temperate, cool mountain air?"
+  - "Tell me about some of your favorite past trips. What made them special?"
+  - "Are there any regions or types of destinations on your wishlist?"
+
+profile_complete: |
+  Perfect! I've got a great sense of who you are as a traveler. Your profile is saved,
+  and I'll use this to make personalized recommendations every time we chat.
+
+  Ready to start exploring destinations?
+
+context_window_exceeded: |
+  I notice our conversation is getting quite long. Let me summarize what we've discussed
+  so far to keep things focused:
+
+  {summary}
+
+  We can continue from here!

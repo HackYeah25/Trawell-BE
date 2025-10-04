@@ -1,0 +1,182 @@
+# Planning module prompts
+
+trip_planning_system: |
+  You are a meticulous trip planning expert. Your role is to create comprehensive,
+  practical trip plans that help users make the most of their destination.
+
+  Guidelines:
+  - Provide accurate, up-to-date information
+  - Be realistic about timing and logistics
+  - Consider the user's energy levels and preferences
+  - Balance popular attractions with hidden gems
+  - Include practical tips and insider knowledge
+  - Warn about common tourist traps or issues
+  - Suggest optimal routes and timing
+
+trip_planning_prompt: |
+  Create a detailed trip plan for:
+
+  Destination: {destination}
+  Dates: {start_date} to {end_date}
+  Duration: {duration} days
+
+  User profile preferences:
+  {user_preferences}
+
+  Include:
+  1. Daily itinerary suggestions (flexible, not rigid)
+  2. Must-see attractions aligned with user interests
+  3. Restaurant and food recommendations
+  4. Practical logistics (transport, tickets, reservations)
+  5. Timing and pacing recommendations
+  6. Weather-dependent backup options
+  7. Budget estimates
+
+weather_analysis: |
+  Analyze weather for {destination} from {start_date} to {end_date}.
+
+  Provide:
+  - Day-by-day forecast (temperature, conditions, precipitation)
+  - What to pack
+  - Weather-appropriate activity suggestions
+  - Indoor alternatives if needed
+
+cultural_guidelines: |
+  Provide cultural information for {destination}:
+
+  Include:
+  - Dress code considerations (religious sites, general norms)
+  - Important customs and etiquette
+  - Tipping practices
+  - Greetings and basic phrases
+  - Dining etiquette
+  - What to avoid/what not to do
+  - Vaccination requirements
+  - Visa requirements for {user_nationality}
+  - Safety tips
+  - Emergency contacts and numbers
+
+poi_discovery: |
+  Suggest points of interest in {destination} matching this profile:
+
+  Interests: {user_interests}
+  Activity level: {activity_level}
+  Budget: {budget_level}
+
+  For each POI provide:
+  - Name and category
+  - Why it matches the user's interests
+  - Opening hours and best time to visit
+  - Ticket prices (note any free days)
+  - Estimated time needed
+  - Pro tips and insider knowledge
+  - How to get there
+
+events_search: |
+  Find local events in {destination} during {travel_dates}:
+
+  Look for:
+  - Festivals and cultural events
+  - Concerts and performances
+  - Sports events
+  - Special exhibitions
+  - Local markets
+  - Seasonal celebrations
+
+  Consider the user's interests: {user_interests}
+
+itinerary_day_template: |
+  Day {day_number} - {date}
+
+  Weather: {weather_summary}
+
+  Morning:
+  {morning_activities}
+
+  Afternoon:
+  {afternoon_activities}
+
+  Evening:
+  {evening_activities}
+
+  Notes: {special_notes}
+
+  Estimated budget for the day: {day_budget}
+
+flight_search_prompt: |
+  Search for flights:
+
+  From: {origin}
+  To: {destination}
+  Departure: {departure_date}
+  Return: {return_date}
+  Passengers: {passengers}
+  Class: {cabin_class}
+
+  Find the best options considering:
+  - Price
+  - Duration
+  - Number of stops
+  - Departure/arrival times
+  - Airlines (note any budget carriers)
+
+  Provide top 3-5 options with pros/cons.
+
+accommodation_suggestions: |
+  Suggest accommodations in {destination} for:
+
+  Budget: {budget_level}
+  Style preference: {accommodation_style}
+  Location priorities: {location_preferences}
+  Dates: {dates}
+
+  For each suggestion:
+  - Name and type
+  - Location and neighborhood vibe
+  - Why it fits their profile
+  - Estimated price
+  - Pros and cons
+  - Booking tips
+
+local_transport: |
+  Provide local transportation guide for {destination}:
+
+  Include:
+  - Public transport options (metro, bus, tram)
+  - Transport cards or passes worth buying
+  - Taxi/ride-share apps and average costs
+  - Bike rentals or walking recommendations
+  - Day trip transportation
+  - What to avoid
+  - Cost estimates
+
+budget_breakdown: |
+  Create budget breakdown for {destination} trip:
+
+  Duration: {duration} days
+  Travelers: {traveler_count}
+  Style: {budget_level}
+
+  Breakdown:
+  - Flights: {flight_estimate}
+  - Accommodation: {accommodation_estimate}
+  - Food: {food_estimate}
+  - Activities: {activities_estimate}
+  - Transport: {transport_estimate}
+  - Miscellaneous: {misc_estimate}
+
+  Total: {total_estimate}
+
+  Include money-saving tips!
+
+customize_itinerary: |
+  The user wants to customize their itinerary:
+
+  Current itinerary: {current_itinerary}
+  User's request: {customization_request}
+
+  Adjust the plan accordingly while maintaining:
+  - Logical flow and pacing
+  - Realistic timing
+  - Budget considerations
+  - User's original preferences
