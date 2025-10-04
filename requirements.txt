@@ -2,7 +2,7 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 python-multipart==0.0.6
-websockets==12.0
+websockets==13.1
 
 # LangChain Framework
 langchain==0.1.4
@@ -11,13 +11,18 @@ langchain-openai==0.0.5
 langchain-anthropic==0.1.1
 langsmith==0.0.83
 
-# Database
-supabase==2.3.0
-postgrest==0.13.2
+# Database / Supabase Stack
+supabase==2.21.1
+postgrest==2.21.1
+gotrue==2.12.4
+storage3==2.21.1
+realtime==2.21.1
+supabase-auth==2.21.1
+supabase-functions==2.21.1
 
 # Environment & Configuration
 python-dotenv==1.0.0
-pydantic==2.5.3
+pydantic==2.11.10
 pydantic-settings==2.1.0
 
 # Authentication
@@ -27,7 +32,7 @@ bcrypt==4.1.2
 email-validator==2.1.0
 
 # External API Clients
-httpx==0.24.1
+httpx==0.28.1
 aiohttp==3.9.1
 
 # YAML Processing
