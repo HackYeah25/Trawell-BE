@@ -37,6 +37,46 @@ class SupabaseService:
             self.client = None
 
     # User Profile Operations
+    async def get_user(self, user_id: str) -> Optional[User]:
+        """Fetch user by id from 'users' table and map to User model."""
+        if not self.client:
+            raise Exception("Supabase client not initialized")
+        try:
+            response = self.client.table("users").select("*").eq("id", user_id).execute()
+            if response.data:
+                return User(**response.data[0])
+            return None
+        except Exception as e:
+            raise Exception(f"Error fetching user: {str(e)}")
+
+    async def update_user(self, user_id: str, fields: Dict[str, Any]) -> User:
+        """Update allowed user fields and updated_at; returns updated User.
+
+        Allowed fields: email, username, full_name, is_active, is_verified
+        """
+        if not self.client:
+            raise Exception("Supabase client not initialized")
+        try:
+            allowed = {k: v for k, v in fields.items() if k in {
+                "email", "username", "full_name", "is_active", "is_verified"
+            } and v is not None}
+
+            if not allowed:
+                user = await self.get_user(user_id)
+                if not user:
+                    raise Exception("User not found")
+                return user
+
+            allowed["updated_at"] = datetime.utcnow().isoformat()
+            self.client.table("users").update(allowed).eq("id", user_id).execute()
+
+            user = await self.get_user(user_id)
+            if not user:
+                raise Exception("User not found after update")
+            return user
+        except Exception as e:
+            raise Exception(f"Error updating user: {str(e)}")
+
     async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
         """Fetch user profile by user_id"""
         if not self.client:
