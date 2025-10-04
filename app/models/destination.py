@@ -9,25 +9,22 @@ from enum import Enum
 
 class RecommendationStatus(str, Enum):
     SUGGESTED = "suggested"
-    SAVED = "saved"
-    BOOKED = "booked"
-    VISITED = "visited"
-
+    DETAILS_GENERATED = "details_generated"
+    DETAILS_COMPLETED = "details_completed"
 
 class Coordinates(BaseModel):
     """Geographic coordinates"""
     lat: float
     lng: float
 
-
 class DestinationInfo(BaseModel):
     """Destination information"""
-    name: str
+    name: str # highlight activity in this destination
+    city: str
     country: str
     region: Optional[str] = None
     coordinates: Optional[Coordinates] = None
     description: Optional[str] = None
-
 
 class Deal(BaseModel):
     """Flight or accommodation deal"""
@@ -40,20 +37,41 @@ class Deal(BaseModel):
     url: Optional[str] = None
     details: Dict[str, Any] = Field(default_factory=dict)
 
+class WeatherInforamtion(BaseModel):
+    """Weather information"""
+    temperature: float
+    weather_description: str
+    humidity: float
+    wind_speed: float
+    optimal_season: Optional[str] = None
+
+class Activity(BaseModel):
+    """Activity"""
+    name: str
+    description: str
+    location: Optional[Coordinates] = None
+    highlighted: bool = False
+    url: Optional[str] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+class DestinationDetails(BaseModel):
+    """Destination details"""
+    reasoning: str
+    weather: WeatherInforamtion
+    estimated_cost: float
+    currency: str = "USD"
+    deals_found: List[Deal] = Field(default_factory=list)
+    activities: List[Activity] = Field(default_factory=list)
+    status: RecommendationStatus = RecommendationStatus.SUGGESTED
+    confidence_score: Optional[float] = None
+    travel_tips: List[str] = Field(default_factory=list)
 
 class DestinationRecommendation(BaseModel):
     """AI-generated destination recommendation"""
     recommendation_id: str
     user_id: str
     destination: DestinationInfo
-    reasoning: str
-    optimal_season: str
-    estimated_budget: float
-    currency: str = "USD"
-    highlights: List[str] = Field(default_factory=list)
-    deals_found: List[Deal] = Field(default_factory=list)
-    status: RecommendationStatus = RecommendationStatus.SUGGESTED
-    confidence_score: Optional[float] = None
+    details: Optional[DestinationDetails] = None # this is filled when we want to go there
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
