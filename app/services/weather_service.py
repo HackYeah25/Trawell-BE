@@ -5,6 +5,7 @@ import httpx
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+from unidecode import unidecode
 
 from app.config import settings
 
@@ -41,9 +42,10 @@ class WeatherService:
         try:
             async with httpx.AsyncClient() as client:
                 url = f"{self.base_url}/forecast.json"
+                normalized_city = unidecode(city)  
                 params = {
                     "key": self.api_key,
-                    "q": f"{city}",
+                    "q": f"{normalized_city}",
                     "days": days,
                     "aqi": "yes",  # Air quality index
                     "alerts": "yes"  # Weather alerts
@@ -179,9 +181,11 @@ class WeatherService:
         try:
             async with httpx.AsyncClient() as client:
                 url = f"{self.base_url}/current.json"
+                normalized_city = unidecode(city)  
+
                 params = {
                     "key": self.api_key,
-                    "q": f"{city}",
+                    "q": f"{normalized_city}",
                     "aqi": "yes"
                 }
                 
