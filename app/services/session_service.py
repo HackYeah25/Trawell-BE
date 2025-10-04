@@ -20,19 +20,18 @@ class SessionService:
     async def _get_redis(self):
         """Get or create async Redis client"""
         if self.redis_client is None:
-            # Parse Redis URL from settings (supports both localhost and Docker)
-            redis_url = settings.redis_url
-            if redis_url.startswith('redis://localhost'):
-                # Local development
-                self.redis_client = await redis.from_url(redis_url, decode_responses=True)
-            else:
-                # Docker or custom Redis
-                self.redis_client = await redis.Redis(
-                    host='localhost',  # Use localhost when running outside Docker
-                    port=6379,
-                    db=0,
-                    decode_responses=True
-                )
+            # Determine Redis host based on environment
+            # In Docker, use service name 'redis', otherwise use 'localhost'
+            import os
+            redis_host = os.environ.get('REDIS_HOST', 'redis' if os.path.exists('/.dockerenv') else 'localhost')
+
+            self.redis_client = await redis.Redis(
+                host=redis_host,
+                port=6379,
+                db=0,
+                decode_responses=True
+            )
+            print(f"DEBUG: Connected to Redis at {redis_host}:6379")
         return self.redis_client
     
     def _get_session_key(self, session_id: str) -> str:
@@ -45,26 +44,32 @@ class SessionService:
     
     async def create_session(self, session_data: Dict[str, Any]) -> str:
         """Create a new profiling session"""
-        redis_client = await self._get_redis()
-        session_id = session_data.get("session_id")
-        if not session_id:
-            session_id = f"prof_{uuid4().hex[:12]}"
+        try:
+            redis_client = await self._get_redis()
+            session_id = session_data.get("session_id")
+            if not session_id:
+                session_id = f"prof_{uuid4().hex[:12]}"
 
-        session_key = self._get_session_key(session_id)
+            session_key = self._get_session_key(session_id)
 
-        # Store session data
-        await redis_client.setex(
-            session_key,
-            self.session_ttl,
-            json.dumps(session_data, default=str)
-        )
+            # Store session data
+            await redis_client.setex(
+                session_key,
+                self.session_ttl,
+                json.dumps(session_data, default=str)
+            )
 
-        # Initialize empty conversation
-        conversation_key = self._get_conversation_key(session_id)
-        await redis_client.setex(conversation_key, self.session_ttl, json.dumps([]))
+            # Initialize empty conversation
+            conversation_key = self._get_conversation_key(session_id)
+            await redis_client.setex(conversation_key, self.session_ttl, json.dumps([]))
 
-        print(f"DEBUG: Created session {session_id} in Redis")
-        return session_id
+            print(f"DEBUG: Created session {session_id} in Redis")
+            return session_id
+        except Exception as e:
+            print(f"ERROR: Failed to create session in Redis: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get session data from Redis"""

@@ -142,34 +142,40 @@ async def start_profiling(
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ) -> StartProfilingResponse:
     """Start a new profiling session"""
-    session_id = f"prof_{uuid.uuid4().hex[:12]}"
-    user_id = request.user_id or (current_user.get("id") if current_user else None)
+    try:
+        session_id = f"prof_{uuid.uuid4().hex[:12]}"
+        user_id = request.user_id or (current_user.get("id") if current_user else None)
 
-    session = ProfilingSession(
-        session_id=session_id,
-        user_id=user_id,
-        status=ProfilingStatus.IN_PROGRESS,
-        current_question_index=0,
-        responses=[],
-        profile_completeness=0.0,
-    )
+        session = ProfilingSession(
+            session_id=session_id,
+            user_id=user_id,
+            status=ProfilingStatus.IN_PROGRESS,
+            current_question_index=0,
+            responses=[],
+            profile_completeness=0.0,
+        )
 
-    # Create session in Redis
-    await create_session(session)
+        # Create session in Redis
+        await create_session(session)
 
-    print(f"DEBUG: Created session {session_id}, total sessions: Redis")
+        print(f"DEBUG: Created session {session_id}, total sessions: Redis")
 
-    intro_message = profiling_agent.get_intro_message()
+        intro_message = profiling_agent.get_intro_message()
 
-    # Add intro message to conversation
-    intro_msg = ProfilingMessage(role="assistant", content=intro_message)
-    await add_message_to_conversation(session_id, intro_msg)
+        # Add intro message to conversation
+        intro_msg = ProfilingMessage(role="assistant", content=intro_message)
+        await add_message_to_conversation(session_id, intro_msg)
 
-    websocket_url = f"/api/profiling/ws/{session_id}"
+        websocket_url = f"/api/profiling/ws/{session_id}"
 
-    return StartProfilingResponse(
-        session=session, first_message=intro_message, websocket_url=websocket_url
-    )
+        return StartProfilingResponse(
+            session=session, first_message=intro_message, websocket_url=websocket_url
+        )
+    except Exception as e:
+        print(f"ERROR: Failed to start profiling session: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to start profiling session: {str(e)}")
 
 
 @router.get("/session/{session_id}")
