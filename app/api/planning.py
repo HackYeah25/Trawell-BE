@@ -132,19 +132,13 @@ async def get_weather_forecast(
 
         # Get weather forecast
         weather_data = await weather_service.get_forecast(
-            latitude=weather_request.latitude,
-            longitude=weather_request.longitude,
+            city=weather_request.city,
             days=weather_request.days
         )
-
         return WeatherResponse(
             success=True,
             data=weather_data,
             location=weather_data.get("location"),
-            coordinates={
-                "latitude": weather_request.latitude,
-                "longitude": weather_request.longitude
-            },
             forecast_days=weather_request.days
         )
 
@@ -157,7 +151,7 @@ async def get_weather_forecast(
 @router.post("/weather", response_model=WeatherResponse)
 async def get_weather_forecast_standalone(
     weather_request: WeatherRequest,
-    current_user: TokenData = Depends(get_current_user),
+    # current_user: TokenData = Depends(get_current_user),
     weather_service: WeatherService = Depends(get_weather_service)
 ):
     """
@@ -174,8 +168,7 @@ async def get_weather_forecast_standalone(
     try:
         # Get weather forecast
         weather_data = await weather_service.get_forecast(
-            latitude=weather_request.latitude,
-            longitude=weather_request.longitude,
+            city=weather_request.city,
             days=weather_request.days
         )
 
@@ -183,10 +176,6 @@ async def get_weather_forecast_standalone(
             success=True,
             data=weather_data,
             location=weather_data.get("location"),
-            coordinates={
-                "latitude": weather_request.latitude,
-                "longitude": weather_request.longitude
-            },
             forecast_days=weather_request.days
         )
 
