@@ -26,7 +26,7 @@ from app.models.profiling import (
     WSProfilingThinking,
     WSProfilingToken,
 )
-from app.agents.profiling_agent import profiling_agent
+from app.agents.profiling_agent import get_profiling_agent
 from app.services.supabase_service import get_supabase
 from app.services.session_service import session_service
 from app.api.deps import get_current_user_optional
@@ -262,7 +262,7 @@ async def reset_user_profile(
 @router.get("/questions")
 async def get_profiling_questions():
     """Get all profiling questions (for frontend to display)"""
-    questions = profiling_agent.get_all_questions()
+    questions = get_profiling_agent().get_all_questions()
 
     # Transform to frontend format
     frontend_questions = [
@@ -300,7 +300,7 @@ async def start_profiling(
 
         print(f"DEBUG: Created session {session_id}, total sessions: Redis")
 
-        intro_message = profiling_agent.get_intro_message()
+        intro_message = get_profiling_agent().get_intro_message()
 
         # Add intro message to conversation
         intro_msg = ProfilingMessage(role="assistant", content=intro_message)
@@ -325,8 +325,8 @@ async def get_profiling_session(session_id: str) -> ProfilingSessionResponse:
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    next_question = profiling_agent.get_next_question(session)
-    is_complete = profiling_agent.is_profile_complete(session)
+    next_question = get_profiling_agent().get_next_question(session)
+    is_complete = get_profiling_agent().is_profile_complete(session)
 
     return ProfilingSessionResponse(
         session=session, next_question=next_question, is_complete=is_complete
@@ -366,7 +366,7 @@ async def profiling_websocket_endpoint(
     await manager.connect(websocket, session_id)
 
     # Send current question
-    current_question = profiling_agent.get_next_question(session)
+    current_question = get_profiling_agent().get_next_question(session)
     print(f"DEBUG: Sending first question to {session_id}: {current_question.id if current_question else 'None'}")
 
     if current_question:
@@ -385,7 +385,7 @@ async def profiling_websocket_endpoint(
             WSProfilingProgress(
                 conversation_id=session_id,
                 current_question=session.current_question_index + 1,
-                total_questions=len(profiling_agent.questions),
+                total_questions=len(get_profiling_agent().questions),
                 completeness=session.profile_completeness,
                 current_question_id=current_question.id,
             ).model_dump(),
@@ -415,7 +415,7 @@ async def handle_user_answer(session_id: str, answer: str):
         print(f"ERROR: Session {session_id} not found in Redis")
         return
 
-    current_question = profiling_agent.get_next_question(session)
+    current_question = get_profiling_agent().get_next_question(session)
 
     if not current_question:
         print(f"DEBUG: Profiling already complete for {session_id}")
@@ -426,7 +426,7 @@ async def handle_user_answer(session_id: str, answer: str):
                 conversation_id=session_id,
                 profile_id=session.user_id or session.session_id,
                 completeness=session.profile_completeness,
-                message=profiling_agent.get_completion_message(),
+                message=get_profiling_agent().get_completion_message(),
             ).model_dump(),
         )
         return
@@ -444,7 +444,7 @@ async def handle_user_answer(session_id: str, answer: str):
 
     print(f"DEBUG: Validating answer with LLM...")
     # Validate answer
-    validation_status, feedback, extracted_value = await profiling_agent.validate_answer(
+    validation_status, feedback, extracted_value = await get_profiling_agent().validate_answer(
         current_question, answer, session
     )
     print(f"DEBUG: Validation result: {validation_status}, feedback: {feedback}")
@@ -460,7 +460,7 @@ async def handle_user_answer(session_id: str, answer: str):
         # Answer is insufficient - ask for more details
         follow_up_count = existing_response.follow_up_count if existing_response else 0
 
-        follow_up = await profiling_agent.generate_follow_up(
+        follow_up = await get_profiling_agent().generate_follow_up(
             current_question, answer, follow_up_count
         )
 
@@ -555,14 +555,14 @@ async def process_sufficient_answer(
 
     # Move to next question
     session.current_question_index += 1
-    session.profile_completeness = profiling_agent.calculate_completeness(session)
+    session.profile_completeness = get_profiling_agent().calculate_completeness(session)
     session.updated_at = datetime.utcnow()
 
     # Save session to Redis after updating
     await save_session(session)
 
     # Check if profiling is complete
-    if profiling_agent.is_profile_complete(session):
+    if get_profiling_agent().is_profile_complete(session):
         session.status = ProfilingStatus.COMPLETED
         session.completed_at = datetime.utcnow()
 
@@ -573,7 +573,7 @@ async def process_sufficient_answer(
         await session_service.save_session_to_database(session_id)
 
         # Extract and save user profile
-        user_profile = profiling_agent.extract_user_profile(session)
+        user_profile = get_profiling_agent().extract_user_profile(session)
 
         # Save to database
         supabase = get_supabase()
@@ -588,7 +588,7 @@ async def process_sufficient_answer(
                 print(f"Error saving profile: {e}")
 
         # Send completion message
-        completion_msg = profiling_agent.get_completion_message()
+        completion_msg = get_profiling_agent().get_completion_message()
         await send_question_message(session_id, completion_msg)
 
         await manager.send_to_session(
@@ -602,7 +602,7 @@ async def process_sufficient_answer(
         )
     else:
         # Get next question
-        next_question = profiling_agent.get_next_question(session)
+        next_question = get_profiling_agent().get_next_question(session)
         if next_question:
             # Send question directly (not streaming for pre-defined questions)
             await send_question_message(session_id, next_question.question)
@@ -613,7 +613,7 @@ async def process_sufficient_answer(
                 WSProfilingProgress(
                     conversation_id=session_id,
                     current_question=session.current_question_index + 1,
-                    total_questions=len(profiling_agent.questions),
+                    total_questions=len(get_profiling_agent().questions),
                     completeness=session.profile_completeness,
                     current_question_id=next_question.id,
                 ).model_dump(),
@@ -651,7 +651,7 @@ async def stream_ai_message(session_id: str, follow_up_prompt: str):
 
     try:
         # Get current question context
-        current_question = profiling_agent.get_next_question(session)
+        current_question = get_profiling_agent().get_next_question(session)
         if not current_question:
             return
 
@@ -680,7 +680,7 @@ Follow-up guidance: {follow_up_prompt}
         # Stream response
         print(f"DEBUG: Starting LLM stream for session {session_id}")
         token_count = 0
-        async for chunk in profiling_agent.llm.astream(messages):
+        async for chunk in get_profiling_agent().llm.astream(messages):
             if hasattr(chunk, "content") and chunk.content:
                 token_count += 1
                 full_response += chunk.content

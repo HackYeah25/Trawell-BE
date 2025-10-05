@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     environment: str = "development"
     debug: bool = True
-    port: int = 8000
+    port: int = 5000
     host: str = "0.0.0.0"
 
     # API Keys
@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="", description="Anthropic API key")
 
     # Supabase
-    supabase_url: str = Field(..., description="Supabase project URL")
-    supabase_key: str = Field(..., description="Supabase anon key")
+    supabase_url: str = Field(default="", description="Supabase project URL")
+    supabase_key: str = Field(default="", description="Supabase anon key")
     supabase_service_key: str = Field(default="", description="Supabase service key")
 
     # Database
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     )
 
     # Authentication
-    secret_key: str = Field(..., description="Secret key for JWT encoding")
+    secret_key: str = Field(default="dev-secret-key-please-change", description="Secret key for JWT encoding")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 

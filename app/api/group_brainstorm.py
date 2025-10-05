@@ -26,7 +26,7 @@ from app.models.group_conversation import (
     ConversationStatus,
 )
 from app.services.supabase_service import get_supabase
-from app.agents.group_moderator import group_moderator
+from app.agents.group_moderator import get_group_moderator
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/api/brainstorm/group", tags=["group-brainstorm"])
@@ -346,7 +346,7 @@ async def group_websocket_endpoint(
                 participants = await get_participants(conversation_id)
                 messages = await get_messages(conversation_id)
 
-                trigger = group_moderator.should_ai_respond(messages, participants)
+                trigger = get_group_moderator().should_ai_respond(messages, participants)
 
                 if trigger.triggered:
                     # Process AI response asynchronously
@@ -368,7 +368,7 @@ async def analyze_and_broadcast_compatibility(
     """Analyze compatibility and broadcast results"""
 
     # Run compatibility analysis
-    compatibility = await group_moderator.analyze_compatibility(participants)
+    compatibility = await get_group_moderator().analyze_compatibility(participants)
 
     # Update conversation with compatibility data
     status = (
@@ -423,7 +423,7 @@ async def process_ai_response(
     conversation = await get_conversation(conversation_id)
     if not conversation or not conversation.compatibility_data:
         # Run compatibility analysis first
-        compatibility = await group_moderator.analyze_compatibility(participants)
+        compatibility = await get_group_moderator().analyze_compatibility(participants)
     else:
         from app.models.group_conversation import CompatibilityAnalysis
 
@@ -440,7 +440,7 @@ async def process_ai_response(
     # Stream AI response
     full_response = ""
 
-    async for token in group_moderator.stream_response(
+    async for token in get_group_moderator().stream_response(
         participants, messages, compatibility
     ):
         full_response += token

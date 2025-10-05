@@ -23,6 +23,15 @@ class ProfilingAgent:
     """Agent for conducting profiling conversations with validation"""
 
     def __init__(self):
+        # Load profiling configuration from YAML
+        self.config = self._load_config()
+        self.questions = self._load_questions()
+        
+        if not settings.openai_api_key:
+            print("Warning: OPENAI_API_KEY not set. ProfilingAgent will not function.")
+            self.llm = None
+            return
+            
         self.llm = ChatOpenAI(
             model=settings.profiling_llm_model,
             api_key=settings.openai_api_key,
@@ -30,10 +39,6 @@ class ProfilingAgent:
             max_tokens=2000,
             streaming=True,
         )
-
-        # Load profiling configuration from YAML
-        self.config = self._load_config()
-        self.questions = self._load_questions()
 
     def _load_config(self) -> Dict[str, Any]:
         """Load profiling configuration from YAML"""
@@ -354,5 +359,15 @@ Validation Requirements:
         )
 
 
-# Global instance
-profiling_agent = ProfilingAgent()
+# Global instance (lazy initialization)
+_profiling_agent_instance = None
+
+def get_profiling_agent() -> ProfilingAgent:
+    """Get or create the global ProfilingAgent instance"""
+    global _profiling_agent_instance
+    if _profiling_agent_instance is None:
+        _profiling_agent_instance = ProfilingAgent()
+    return _profiling_agent_instance
+
+# For backward compatibility
+profiling_agent = None

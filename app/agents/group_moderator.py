@@ -26,6 +26,12 @@ class GroupModeratorAgent:
     """AI agent for moderating group travel planning conversations"""
 
     def __init__(self):
+        if not settings.openai_api_key:
+            print("Warning: OPENAI_API_KEY not set. GroupModeratorAgent will not function.")
+            self.llm = None
+            self.streaming_llm = None
+            return
+            
         self.llm = ChatOpenAI(
             model=settings.default_llm_model,
             temperature=0.7,
@@ -478,5 +484,15 @@ Compromise Needed: {compatibility.compromise_needed}
                 yield chunk.content
 
 
-# Global instance
-group_moderator = GroupModeratorAgent()
+# Global instance (lazy initialization)
+_group_moderator_instance = None
+
+def get_group_moderator() -> GroupModeratorAgent:
+    """Get or create the global GroupModeratorAgent instance"""
+    global _group_moderator_instance
+    if _group_moderator_instance is None:
+        _group_moderator_instance = GroupModeratorAgent()
+    return _group_moderator_instance
+
+# For backward compatibility
+group_moderator = None
