@@ -4,6 +4,7 @@ https://developers.amadeus.com/self-service/apis-docs
 """
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
+import re
 import httpx
 from app.config import settings
 
@@ -183,13 +184,36 @@ class AmadeusService:
         )
 
         offers = result.get("data", []) or []
-        summary: List[Dict[str, Any]] = []
+        # Helper to format ISO8601 durations like 'PT6H19M' or 'P1DT2H'
+        def _format_duration(iso: Any) -> Any:
+            if not isinstance(iso, str):
+                return iso
+            pattern = re.compile(r"^P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?(?:(?P<seconds>\d+)S)?)?$")
+            m = pattern.match(iso)
+            if not m:
+                return iso
+            days = m.group("days")
+            hours = m.group("hours")
+            minutes = m.group("minutes")
+            seconds = m.group("seconds")
+            parts: List[str] = []
+            if days:
+                parts.append(f"{int(days)}d")
+            if hours:
+                parts.append(f"{int(hours)}h")
+            if minutes:
+                parts.append(f"{int(minutes)}m")
+            if seconds:
+                parts.append(f"{int(seconds)}s")
+            return " ".join(parts) if parts else "0m"
+        simplified_offers: List[Dict[str, Any]] = []
         for offer in offers:
             price_info = offer.get("price", {}) or {}
-            itineraries_out: List[Dict[str, Any]] = []
-            for itin in offer.get("itineraries", []) or []:
+            itineraries = offer.get("itineraries", []) or []
+
+            def build_itin(itin_obj: Dict[str, Any]) -> Dict[str, Any]:
                 seg_out: List[Dict[str, Any]] = []
-                for seg in itin.get("segments", []) or []:
+                for seg in itin_obj.get("segments", []) or []:
                     dep = seg.get("departure", {}) or {}
                     arr = seg.get("arrival", {}) or {}
                     seg_out.append({
@@ -197,16 +221,21 @@ class AmadeusService:
                         "to": arr.get("iataCode"),
                         "departureAt": dep.get("at"),
                         "arrivalAt": arr.get("at"),
-                        "duration": seg.get("duration"),
+                        "duration": _format_duration(seg.get("duration")),
                     })
-                itineraries_out.append({
-                    "totalDuration": itin.get("duration"),
+                return {
+                    "totalDuration": _format_duration(itin_obj.get("duration")),
                     "segments": seg_out,
-                })
-            summary.append({
+                }
+
+            outbound = build_itin(itineraries[0]) if len(itineraries) >= 1 else None
+            inbound = build_itin(itineraries[1]) if len(itineraries) >= 2 else None
+
+            simplified_offers.append({
                 "price": price_info.get("total"),
                 "currency": price_info.get("currency") or price_info.get("currencyCode"),
-                "itineraries": itineraries_out,
+                "outbound": outbound,
+                "return": inbound,
             })
 
         def _price_to_float(p):
@@ -215,11 +244,8 @@ class AmadeusService:
             except Exception:
                 return float("inf")
 
-        summary_sorted = sorted(summary, key=lambda x: _price_to_float(x.get("price")))
-        result["summary"] = summary_sorted
-        if summary_sorted:
-            result["cheapest"] = summary_sorted[0]
-        return result
+        cheapest = min(simplified_offers, key=lambda x: _price_to_float(x.get("price"))) if simplified_offers else {}
+        return cheapest
 
     async def get_flight_price(
         self, flight_offers: List[Dict[str, Any]]
@@ -343,7 +369,6 @@ class AmadeusService:
         room_quantity: int = 1,
         radius: int = 5,
         radius_unit: str = "KM",
-        max_hotels: int = 10,
     ) -> Dict[str, Any]:
         """Fetch hotels by city, then retrieve offers for those hotels and return a summary.
 
@@ -367,18 +392,16 @@ class AmadeusService:
             if isinstance(hid, str):
                 hotel_ids.append(hid)
 
-        # Deduplicate and cap
+        # Deduplicate (search full set from response; no artificial limit)
         seen = set()
         unique_ids: List[str] = []
         for hid in hotel_ids:
             if hid not in seen:
                 seen.add(hid)
                 unique_ids.append(hid)
-            if len(unique_ids) >= max_hotels:
-                break
 
         if not unique_ids:
-            return {"count": 0, "results": []}
+            return []
 
         offers_resp = await self.search_hotel_offers(
             hotel_ids=unique_ids,
@@ -411,27 +434,34 @@ class AmadeusService:
 
             simplified_offers_sorted = sorted(simplified_offers, key=_offer_price_to_float)
 
+            hotel_id = hotel.get("hotelId")
+            # Skip sandbox test properties like HNPARSPC
+            if hotel_id == "HNPARSPC":
+                continue
+
+            cheapest_offer = simplified_offers_sorted[0] if simplified_offers_sorted else None
+            if not cheapest_offer:
+                continue
+
+            # Flatten output: only name, price, currency, checkInDate, checkOutDate
             results.append({
-                "hotelId": hotel.get("hotelId"),
                 "name": hotel.get("name"),
-                "offers": simplified_offers_sorted,
-                "cheapest": simplified_offers_sorted[0] if simplified_offers_sorted else None,
+                "price": cheapest_offer.get("price"),
+                "currency": cheapest_offer.get("currency"),
+                "checkInDate": cheapest_offer.get("checkInDate"),
+                "checkOutDate": cheapest_offer.get("checkOutDate"),
             })
 
         # Sort hotels by their cheapest offer price and expose overall cheapest
         def _hotel_min_price(h):
-            ch = h.get("cheapest") or {}
             try:
-                return float(ch.get("price")) if ch.get("price") is not None else float("inf")
+                return float(h.get("price")) if h.get("price") is not None else float("inf")
             except Exception:
                 return float("inf")
 
         results_sorted = sorted(results, key=_hotel_min_price)
-        return {
-            "count": len(results_sorted),
-            "results": results_sorted,
-            "cheapest": results_sorted[0] if results_sorted else None,
-        }
+        # Return just the results list (no count)
+        return results_sorted
 
     async def get_hotel_offer(self, offer_id: str) -> Dict[str, Any]:
         """
@@ -444,6 +474,201 @@ class AmadeusService:
             Hotel offer details
         """
         return await self._make_request("GET", f"/v3/shopping/hotel-offers/{offer_id}")
+
+    # ============================================================================
+    # TRIP AGGREGATION
+    # ============================================================================
+
+    async def get_trip_details(
+        self,
+        origin: str,
+        destination: str,
+        departure_date: Optional[str] = None,
+        return_date: Optional[str] = None,
+        adults: int = 1,
+        travel_class: Optional[str] = None,
+        nonstop: bool = True,
+        hotel_radius: int = 5,
+        hotel_radius_unit: str = "KM",
+        room_quantity: int = 1,
+    ) -> Dict[str, Any]:
+        """Get cheapest flights in both directions and hotels for those dates.
+
+        Returns structure:
+        {
+          "flights": {
+             "outbound": { "price", "currency", "itinerary" },
+             "return": { "price", "currency", "itinerary" }
+          },
+          "hotels": [ { name, price, currency, checkInDate, checkOutDate }, ... ]
+        }
+        """
+        # Pick cheapest dates using flight-dates endpoints
+        def _pick_cheapest_date(dates_resp: Dict[str, Any]) -> Optional[str]:
+            try:
+                items = dates_resp.get("data", []) or []
+                def _price_total(item: Dict[str, Any]) -> float:
+                    try:
+                        return float(((item.get("price") or {}).get("total")) or float("inf"))
+                    except Exception:
+                        return float("inf")
+                best = min(items, key=_price_total) if items else None
+                if not best:
+                    return None
+                # Prefer explicit departureDate, fallback to date keys
+                date_val = best.get("departureDate") or best.get("date") or best.get("departure_date")
+                return str(date_val) if date_val else None
+            except Exception:
+                return None
+
+        # Helpers for resilient lookups
+        def _date_str(d: datetime) -> str:
+            return d.strftime("%Y-%m-%d")
+
+        def _parse_date(d: str) -> Optional[datetime]:
+            try:
+                return datetime.strptime(d, "%Y-%m-%d")
+            except Exception:
+                return None
+
+        async def _safe_search_flight_dates(o: str, d: str) -> Dict[str, Any]:
+            try:
+                return await self.search_flight_dates(origin=o, destination=d)
+            except Exception:
+                return {}
+
+        async def _find_one_way_cheapest_offer(
+            o: str,
+            d: str,
+            seed_date: str,
+            pax: int,
+            cls: Optional[str],
+            prefer_nonstop: bool,
+        ) -> Dict[str, Any]:
+            """Try seed date, then nearby +/- days, and relax nonstop if needed."""
+            candidate_dates: List[str] = []
+            parsed = _parse_date(seed_date)
+            if parsed:
+                # Window: -2..+3 days
+                for delta in [-2, -1, 0, 1, 2, 3]:
+                    candidate_dates.append(_date_str(parsed + timedelta(days=delta)))
+            else:
+                candidate_dates.append(seed_date)
+
+            async def _try_dates(nonstop_flag: bool) -> Dict[str, Any]:
+                best: Dict[str, Any] = {}
+                best_price = float("inf")
+                for cd in candidate_dates:
+                    try:
+                        offer = await self.search_flights(
+                            origin=o,
+                            destination=d,
+                            departure_date=cd,
+                            adults=pax,
+                            return_date=None,
+                            travel_class=cls,
+                            nonstop=nonstop_flag,
+                        )
+                        price = offer.get("price") if isinstance(offer, dict) else None
+                        if price is None:
+                            continue
+                        try:
+                            p = float(price)
+                        except Exception:
+                            p = float("inf")
+                        if p < best_price:
+                            best = offer
+                            best_price = p
+                    except Exception:
+                        continue
+                return best
+
+            # Prefer requested nonstop, then relax
+            offer = await _try_dates(prefer_nonstop)
+            if not offer:
+                offer = await _try_dates(False)
+            return offer
+
+        out_dates = await _safe_search_flight_dates(origin, destination)
+        ret_dates = await _safe_search_flight_dates(destination, origin)
+
+        today = datetime.now()
+        default_dep = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+        default_ret = (today + timedelta(days=14)).strftime("%Y-%m-%d")
+        seed_departure = departure_date or default_dep
+        seed_return = return_date or default_ret
+
+        cheapest_out_date = _pick_cheapest_date(out_dates) or seed_departure
+        cheapest_ret_date = _pick_cheapest_date(ret_dates) or seed_return
+
+        # Outbound offer on cheapest date (with fallbacks)
+        out_offer = await _find_one_way_cheapest_offer(
+            origin, destination, cheapest_out_date, adults, travel_class, nonstop
+        )
+
+        # Return offer on cheapest date (with fallbacks)
+        ret_offer = await _find_one_way_cheapest_offer(
+            destination, origin, cheapest_ret_date, adults, travel_class, nonstop
+        )
+
+        # Extract dates: check-in = outbound arrival date; check-out = return departure date
+        def _first_segment_departure_date(itin: Optional[Dict[str, Any]]) -> Optional[str]:
+            try:
+                if not itin or not itin.get("segments"):
+                    return None
+                dep_at = itin["segments"][0].get("departureAt")
+                return dep_at.split("T")[0] if isinstance(dep_at, str) and "T" in dep_at else dep_at
+            except Exception:
+                return None
+
+        def _last_segment_arrival_date(itin: Optional[Dict[str, Any]]) -> Optional[str]:
+            try:
+                if not itin or not itin.get("segments"):
+                    return None
+                arr_at = itin["segments"][-1].get("arrivalAt")
+                return arr_at.split("T")[0] if isinstance(arr_at, str) and "T" in arr_at else arr_at
+            except Exception:
+                return None
+
+        out_itin = out_offer.get("outbound") if isinstance(out_offer, dict) else None
+        ret_itin = ret_offer.get("outbound") if isinstance(ret_offer, dict) else None
+
+        check_in_date = _last_segment_arrival_date(out_itin) or cheapest_out_date
+        check_out_date = _first_segment_departure_date(ret_itin) or cheapest_ret_date
+        # If we still failed to get a return leg, ensure a sane hotel window (2 nights)
+        if not ret_itin:
+            parsed_in = _parse_date(check_in_date)
+            if parsed_in:
+                check_out_date = _date_str(parsed_in + timedelta(days=2))
+
+        # Hotels in destination city using dates
+        hotels = await self.get_hotel_offers_for_city(
+            city_code=destination[:3],
+            check_in_date=check_in_date,
+            check_out_date=check_out_date,
+            adults=adults,
+            room_quantity=room_quantity,
+            radius=hotel_radius,
+            radius_unit=hotel_radius_unit,
+        )
+
+        flights_payload = {
+            "outbound": {
+                "price": out_offer.get("price") if isinstance(out_offer, dict) else None,
+                "currency": out_offer.get("currency") if isinstance(out_offer, dict) else None,
+                "itinerary": out_itin,
+            },
+            "return": {
+                "price": ret_offer.get("price") if isinstance(ret_offer, dict) else None,
+                "currency": ret_offer.get("currency") if isinstance(ret_offer, dict) else None,
+                "itinerary": ret_itin,
+            },
+        }
+
+        return {
+            "flights": flights_payload,
+            "hotels": hotels,
+        }
 
     # ============================================================================
     # LOCATION APIs
@@ -528,54 +753,26 @@ if __name__ == "__main__":
     import asyncio
     import json
 
-    async def _test_search_flights():
-        """Basic manual test for search_flights()."""
+    async def _test_get_trip_details():
+        """End-to-end test for two one-way legs + hotels (round trip)."""
         try:
             svc = AmadeusService()  # uses settings for credentials
-            dep_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-            result = await svc.search_flights(
+            result = await svc.get_trip_details(
                 origin="JFK",
                 destination="LAX",
-                departure_date=dep_date,
                 adults=1,
+                travel_class=None,
                 nonstop=True,
-                max_results=5,
-            )
-            print(json.dumps({
-                "cheapest": result.get("cheapest"),
-                "count": len(result.get("summary", [])),
-            }, indent=2))
-        except Exception as e:
-            print({
-                "status": "error",
-                "error": str(e),
-            })
-
-    async def _test_search_hotels_by_city():
-        """Basic manual test for fetching hotel offers by city."""
-        try:
-            svc = AmadeusService()  # uses settings for credentials
-            check_in = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-            check_out = (datetime.now() + timedelta(days=32)).strftime("%Y-%m-%d")
-            result = await svc.get_hotel_offers_for_city(
-                city_code="PAR",
-                check_in_date=check_in,
-                check_out_date=check_out,
-                adults=2,
+                hotel_radius=5,
+                hotel_radius_unit="KM",
                 room_quantity=1,
-                radius=3,
-                radius_unit="KM",
-                max_hotels=5,
             )
             print(json.dumps(result, indent=2))
         except Exception as e:
-            print({
-                "status": "error",
-                "error": str(e),
-            })
+            print({"status": "error", "error": str(e)})
 
     async def _main():
-        await _test_search_flights()
-        await _test_search_hotels_by_city()
+        # Demonstrate two-leg search producing a non-null return itinerary
+        await _test_get_trip_details()
 
     asyncio.run(_main())
