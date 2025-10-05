@@ -19,6 +19,7 @@ from app.models.user import UserProfile
 from app.models.destination import DestinationRecommendation , DestinationInfo , Rating
 
 from app.services.supabase_service import get_supabase
+from app.prompts.loader import get_prompt_loader
 
 from app.config import settings
 
@@ -35,6 +36,12 @@ class BrainstormAgent:
         """
         self.user_profile = user_profile
         self.supabase = get_supabase()
+        
+        # Load prompts from brainstorm.yaml
+        prompt_loader = get_prompt_loader()
+        self.prompts = prompt_loader.get_all_prompts('brainstorm')
+        print(f"✅ Loaded {len(self.prompts)} prompts from brainstorm.yaml")
+        print(f"   Available prompts: {list(self.prompts.keys())}")
 
         # Initialize LLM
         # Note: gpt-4o-search-preview does not support temperature/top_p/n parameters
@@ -64,7 +71,7 @@ class BrainstormAgent:
         print(f"  - Activity level: {user_profile.preferences.activity_level}")
 
     def _build_system_prompt(self) -> str:
-        """Build system prompt with injected user profile"""
+        """Build system prompt from brainstorm.yaml with injected user profile"""
 
         # Extract key profile info
         prefs = self.user_profile.preferences
@@ -72,15 +79,15 @@ class BrainstormAgent:
 
         # Build profile summary
         profile_summary = f"""
-USER PROFILE (use this context for ALL responses):
-- Traveler Type: {prefs.traveler_type or 'mixed'}
-- Activity Level: {prefs.activity_level or 'medium'}
-- Preferred Environment: {prefs.environment or 'varied'}
-- Accommodation Style: {prefs.accommodation_style or 'flexible'}
-- Budget Sensitivity: {prefs.budget_sensitivity or 'medium'}
-- Culture Interest: {prefs.culture_interest or 'medium'}
-- Food Importance: {prefs.food_importance or 'medium'}
-"""
+        USER PROFILE (use this context for ALL responses):
+        - Traveler Type: {prefs.traveler_type or 'mixed'}
+        - Activity Level: {prefs.activity_level or 'medium'}
+        - Preferred Environment: {prefs.environment or 'varied'}
+        - Accommodation Style: {prefs.accommodation_style or 'flexible'}
+        - Budget Sensitivity: {prefs.budget_sensitivity or 'medium'}
+        - Culture Interest: {prefs.culture_interest or 'medium'}
+        - Food Importance: {prefs.food_importance or 'medium'}
+        """
 
         if constraints.dietary_restrictions:
             profile_summary += f"- Dietary: {', '.join(constraints.dietary_restrictions)}\n"
@@ -94,32 +101,31 @@ USER PROFILE (use this context for ALL responses):
         if self.user_profile.past_destinations:
             profile_summary += f"- Been to: {', '.join(self.user_profile.past_destinations[:3])}\n"
 
-        # Build full system prompt
-        system_prompt = f"""You are a world-class travel expert specialized in AUTHENTIC travel experiences.
+        # Get base prompt from brainstorm.yaml
+        base_prompt = self.prompts.get('destination_discovery_system', '')
+        
+        # Inject user profile and current date
+        system_prompt = f"""{base_prompt}
 
 {profile_summary}
 
-PHILOSOPHY:
-- Podróżnik (Traveler) ≠ Turysta (Tourist)
-- Focus on authentic experiences, not tourist traps
-- Prioritize insights from travel forums (Reddit r/travel, TripAdvisor forums, Lonely Planet)
-- Suggest non-obvious, hidden gem destinations
-
-YOUR APPROACH:
-1. Start with a warm, personalized greeting based on their wishlist
-2. Ask clarifying questions to understand their current travel dreams
-3. Once you have enough information, suggest 1-3 specific destinations
-4. For each suggestion, explain WHY it matches their profile
-5. Be enthusiastic but authentic - like a well-traveled friend
-
-IMPORTANT:
-- ALWAYS consider their profile when responding
-- Adapt your tone to their traveler type
-- Consider their budget, dietary needs, and climate preferences
-- Reference their wishlist when appropriate
-
 Current date: {datetime.now().strftime('%Y-%m-%d')}
 """
+        
+        # Log system prompt for debugging
+        print(f"\n{'='*80}")
+        print(f"🎯 SYSTEM PROMPT LOADED:")
+        print(f"{'='*80}")
+        print(f"Base prompt length: {len(base_prompt)} chars")
+        print(f"Contains '<locations>' keyword: {'<locations>' in base_prompt}")
+        if '<locations>' in base_prompt:
+            # Show context around <locations>
+            idx = base_prompt.find('<locations>')
+            start = max(0, idx - 100)
+            end = min(len(base_prompt), idx + 200)
+            print(f"Context around <locations>:\n...{base_prompt[start:end]}...")
+        print(f"{'='*80}\n")
+        
         return system_prompt
 
     def generate_first_message(self) -> str:
@@ -157,7 +163,12 @@ Current date: {datetime.now().strftime('%Y-%m-%d')}
         Yields:
             Response tokens
         """
-        print(f"DEBUG: Processing message: {user_message[:50]}...")
+        print(f"\n{'='*80}")
+        print(f"🧠 BRAINSTORM AGENT - Processing user message")
+        print(f"{'='*80}")
+        print(f"📨 User message (length: {len(user_message)} chars):")
+        print(f"   {user_message[:150]}...")
+        print(f"💾 Memory history: {len(self.memory.chat_memory.messages)} messages")
 
         # Build messages with system prompt and memory
         messages = [
@@ -167,26 +178,50 @@ Current date: {datetime.now().strftime('%Y-%m-%d')}
         # Add conversation history from memory
         if self.memory.chat_memory.messages:
             messages.extend(self.memory.chat_memory.messages)
+            print(f"   Including {len(self.memory.chat_memory.messages)} historical messages")
 
         # Add current user message
         messages.append(HumanMessage(content=user_message))
 
+        print(f"🤖 Calling LLM with {len(messages)} total messages (1 system + {len(self.memory.chat_memory.messages)} history + 1 user)")
+        print(f"{'='*80}\n")
+
         # Stream response
         full_response = ""
+        chunk_count = 0
         try:
             async for chunk in self.llm.astream(messages):
                 if hasattr(chunk, "content") and chunk.content:
                     full_response += chunk.content
+                    chunk_count += 1
                     yield chunk.content
 
-            print(f"DEBUG: Response completed, length: {len(full_response)}")
+            print(f"\n{'='*80}")
+            print(f"✅ LLM RESPONSE COMPLETED")
+            print(f"{'='*80}")
+            print(f"📊 Stats:")
+            print(f"   Chunks received: {chunk_count}")
+            print(f"   Total length: {len(full_response)} chars")
+            print(f"   Lines: {full_response.count(chr(10))}")
+            
+            # Check for location tags in response
+            if '<locations>' in full_response:
+                print(f"   ✅ Contains <locations> tags")
+            else:
+                print(f"   ⚠️  Does NOT contain <locations> tags")
+            
+            print(f"\n📝 Response preview (first 300 chars):")
+            print(f"{full_response[:300].replace(chr(10), ' ')}...")
+            print(f"{'='*80}\n")
 
             # Save to memory after streaming completes
             self.memory.chat_memory.add_user_message(user_message)
             self.memory.chat_memory.add_ai_message(full_response)
 
         except Exception as e:
-            print(f"ERROR: Error in chat streaming: {e}")
+            print(f"\n{'='*80}")
+            print(f"❌ ERROR in chat streaming: {e}")
+            print(f"{'='*80}")
             import traceback
             traceback.print_exc()
             yield "Przepraszam, wystąpił błąd. Spróbuj ponownie."

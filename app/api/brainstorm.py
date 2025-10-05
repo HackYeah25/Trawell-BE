@@ -7,6 +7,7 @@ from typing import Dict, Optional, List
 import uuid
 import asyncio
 import json
+import re
 from datetime import datetime
 
 from app.models.user import UserProfile, UserPreferences, UserConstraints, TokenData
@@ -23,6 +24,84 @@ active_agents: Dict[str, BrainstormAgent] = {}
 
 # Test user ID for development
 TEST_USER_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+
+
+def extract_location_proposals(text: str) -> tuple[str, Optional[List[Dict]]]:
+    """
+    Extract location proposals from <locations> XML tags
+    
+    Args:
+        text: Response text potentially containing <locations> tags
+        
+    Returns:
+        Tuple of (cleaned_text, locations_list)
+        - cleaned_text: Text with <locations> tags removed
+        - locations_list: Parsed JSON array of locations, or None if not found
+    """
+    print(f"\n{'='*80}")
+    print(f"🔍 LOCATION EXTRACTION - Analyzing response (length: {len(text)} chars)")
+    print(f"{'='*80}")
+    
+    # Show first 200 chars of response
+    preview = text[:200].replace('\n', ' ')
+    print(f"📝 Response preview: {preview}...")
+    
+    # Find <locations> tags
+    pattern = r'<locations>\s*(\[[\s\S]*?\])\s*</locations>'
+    match = re.search(pattern, text)
+    
+    if not match:
+        print(f"❌ NO LOCATION TAGS FOUND in response")
+        print(f"   Searched for pattern: <locations>[...]</locations>")
+        
+        # Check if "location" appears anywhere to help debug
+        if 'location' in text.lower():
+            print(f"   ℹ️  Found 'location' keyword in text, but not in proper format")
+            # Show context around "location" keyword
+            loc_index = text.lower().find('location')
+            context_start = max(0, loc_index - 50)
+            context_end = min(len(text), loc_index + 100)
+            print(f"   Context: ...{text[context_start:context_end]}...")
+        else:
+            print(f"   ℹ️  'location' keyword not found in response at all")
+        
+        print(f"{'='*80}\n")
+        return text, None
+    
+    print(f"✅ FOUND <locations> TAGS!")
+    
+    # Extract JSON
+    locations_json = match.group(1)
+    print(f"📦 Extracted JSON (length: {len(locations_json)} chars):")
+    print(f"{locations_json[:300]}...")  # Show first 300 chars
+    
+    try:
+        # Parse JSON
+        locations = json.loads(locations_json)
+        
+        print(f"✅ Successfully parsed JSON - found {len(locations)} location(s)")
+        
+        # Log each location
+        for idx, loc in enumerate(locations, 1):
+            print(f"   {idx}. {loc.get('name', 'N/A')}, {loc.get('country', 'N/A')}")
+            print(f"      ID: {loc.get('id', 'N/A')}")
+            print(f"      Teaser: {loc.get('teaser', 'N/A')[:60]}...")
+        
+        # Remove the <locations> block from text
+        cleaned_text = re.sub(pattern, '', text).strip()
+        
+        print(f"🧹 Cleaned text (length after removal: {len(cleaned_text)} chars)")
+        print(f"{'='*80}\n")
+        
+        return cleaned_text, locations
+        
+    except json.JSONDecodeError as e:
+        print(f"❌ FAILED TO PARSE LOCATIONS JSON!")
+        print(f"   Error: {e}")
+        print(f"   JSON string: {locations_json[:200]}...")
+        print(f"{'='*80}\n")
+        # Return original text if parsing fails
+        return text, None
 
 
 @router.get("/sessions")
@@ -237,8 +316,27 @@ async def brainstorm_websocket(
             # Get user profile
             user_profile = await supabase.get_user_profile(conversation["user_id"])
             if not user_profile:
-                await websocket.close(code=1011, reason="User profile not found")
-                return
+                # Use test profile for development (same as session creation)
+                print(f"⚠️  No profile for user {conversation['user_id']}, using test profile")
+                user_profile = UserProfile(
+                    user_id=conversation["user_id"],
+                    preferences=UserPreferences(
+                        traveler_type="explorer",
+                        activity_level="high",
+                        environment="mixed",
+                        accommodation_style="boutique",
+                        budget_sensitivity="medium",
+                        culture_interest="high",
+                        food_importance="high"
+                    ),
+                    constraints=UserConstraints(
+                        dietary_restrictions=[],
+                        climate_preferences=["mild_temperate", "hot_tropical"],
+                        language_preferences=[]
+                    ),
+                    wishlist_regions=["Southeast Asia", "Iceland"],
+                    past_destinations=["Paris", "Barcelona"]
+                )
 
             # Rehydrate agent with conversation history
             agent = BrainstormAgent(user_profile)
@@ -270,26 +368,133 @@ async def brainstorm_websocket(
                     "session_id": session_id
                 })
 
-                # Stream response from agent
+                # Stream response from agent with tag detection
+                print(f"\n🤖 Starting to stream agent response...")
                 full_response = ""
+                token_count = 0
+                inside_locations_tag = False
+                stream_buffer = ""  # Buffer to detect tags in real-time
+                pending_tokens = []  # Tokens waiting to be sent (in case partial tag detected)
+                
                 async for token in agent.chat(user_message):
                     full_response += token
+                    token_count += 1
+                    stream_buffer += token
+                    pending_tokens.append(token)
+                    
+                    # Keep buffer reasonable size (last 200 chars to catch full tag)
+                    if len(stream_buffer) > 200:
+                        # Only trim if we're sure we're not in the middle of a tag
+                        if not any(partial in stream_buffer[-200:-180] for partial in ["<loc", "<loca", "<locat"]):
+                            stream_buffer = stream_buffer[-200:]
+                    
+                    # Check if we're entering <locations> tag
+                    if not inside_locations_tag and "<locations>" in stream_buffer:
+                        inside_locations_tag = True
+                        print(f"🚫 Detected <locations> tag - suppressing stream")
+                        
+                        # Find where tag starts and send only tokens before it
+                        tag_start_in_buffer = stream_buffer.find("<locations>")
+                        # Calculate how many pending tokens are before the tag
+                        chars_before_tag = tag_start_in_buffer
+                        safe_content = stream_buffer[:chars_before_tag]
+                        
+                        # Send only the safe content before the tag
+                        if safe_content:
+                            await websocket.send_json({
+                                "type": "token",
+                                "session_id": session_id,
+                                "token": safe_content
+                            })
+                        
+                        pending_tokens = []
+                        stream_buffer = ""
+                        continue
+                    
+                    # If inside locations tag, don't send tokens
+                    if inside_locations_tag:
+                        pending_tokens = []  # Clear pending
+                        # Check if we've closed the tag
+                        if "</locations>" in stream_buffer:
+                            inside_locations_tag = False
+                            # Find content after closing tag
+                            tag_end = stream_buffer.find("</locations>") + len("</locations>")
+                            stream_buffer = stream_buffer[tag_end:]
+                            print(f"✅ Detected </locations> tag - resuming stream")
+                        continue
+                    
+                    # Check if buffer might contain start of tag (be cautious)
+                    last_chars = stream_buffer[-15:] if len(stream_buffer) >= 15 else stream_buffer
+                    possible_tag_start = any(last_chars.endswith(partial) for partial in ["<", "<l", "<lo", "<loc", "<loca", "<locat", "<locati", "<locatio", "<location"])
+                    
+                    if possible_tag_start:
+                        # Hold tokens until we know if it's really a tag
+                        if len(pending_tokens) <= 15:  # Max tag length
+                            continue  # Wait for more tokens
+                    
+                    # Safe to send - no tag detected
+                    if pending_tokens:
+                        combined = "".join(pending_tokens)
+                        await websocket.send_json({
+                            "type": "token",
+                            "session_id": session_id,
+                            "token": combined
+                        })
+                        pending_tokens = []
+                    
+                    await asyncio.sleep(0.01)
+                
+                # Send any remaining pending tokens at the end
+                if pending_tokens and not inside_locations_tag:
+                    combined = "".join(pending_tokens)
                     await websocket.send_json({
                         "type": "token",
                         "session_id": session_id,
-                        "token": token
+                        "token": combined
                     })
-                    await asyncio.sleep(0.01)
+                    print(f"📤 Sent {len(pending_tokens)} remaining tokens at stream end")
 
-                # Send complete message
+                print(f"✅ Streaming complete - received {token_count} tokens, total length: {len(full_response)} chars")
+
+                # Log full raw response for debugging
+                print(f"\n{'='*80}")
+                print(f"📜 RAW LLM RESPONSE (full text):")
+                print(f"{'='*80}")
+                print(full_response)
+                print(f"{'='*80}\n")
+
+                # Extract location proposals if present
+                print(f"\n🔎 Checking for location proposals in response...")
+                cleaned_response, locations = extract_location_proposals(full_response)
+
+                # Send location proposals if found
+                if locations:
+                    print(f"\n📍 SENDING LOCATIONS TO CLIENT:")
+                    print(f"   Session: {session_id}")
+                    print(f"   Count: {len(locations)}")
+                    for idx, loc in enumerate(locations, 1):
+                        print(f"   {idx}. {loc.get('name')} ({loc.get('id')})")
+                    
+                    await websocket.send_json({
+                        "type": "locations",
+                        "session_id": session_id,
+                        "locations": locations
+                    })
+                    print(f"✅ Location proposals sent via WebSocket")
+                else:
+                    print(f"ℹ️  No location proposals to send (locations is None)")
+
+                # Send complete message (without location tags)
+                print(f"\n💬 Sending final message to client (cleaned text, length: {len(cleaned_response)} chars)")
                 await websocket.send_json({
                     "type": "message",
                     "session_id": session_id,
                     "role": "assistant",
-                    "content": full_response
+                    "content": cleaned_response
                 })
+                print(f"✅ Complete message sent")
 
-                # Persist to database
+                # Persist to database (store cleaned response without location tags)
                 if supabase.client:
                     # Get current conversation
                     result = supabase.client.table("conversations").select("messages").eq(
@@ -299,7 +504,7 @@ async def brainstorm_websocket(
                     if result.data:
                         current_messages = result.data[0].get("messages", [])
 
-                        # Append new messages
+                        # Append new messages (use cleaned response)
                         current_messages.append({
                             "role": "user",
                             "content": user_message,
@@ -307,8 +512,9 @@ async def brainstorm_websocket(
                         })
                         current_messages.append({
                             "role": "assistant",
-                            "content": full_response,
-                            "timestamp": datetime.utcnow().isoformat()
+                            "content": cleaned_response,  # Store cleaned text without <locations>
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "has_locations": locations is not None  # Flag for frontend
                         })
 
                         # Update conversation
@@ -359,9 +565,125 @@ async def delete_brainstorm_session(
         print(f"ERROR deleting session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/sessions/{session_id}/recommendations")
+async def create_recommendation_from_location(
+    session_id: str,
+    location_data: Dict[str, Any],
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    Create a trip recommendation from a rated location proposal
+    This converts a location proposal into a full trip plan
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Verify session exists and belongs to user
+        result = supabase.client.table("conversations").select("*").eq(
+            "conversation_id", session_id
+        ).eq("user_id", user_id).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Extract location data
+        location_id = location_data.get("id")
+        location_name = location_data.get("name")
+        country = location_data.get("country")
+        teaser = location_data.get("teaser")
+        rating = location_data.get("rating")
+
+        # Create destination info
+        destination_info = DestinationInfo(
+            name=location_name,
+            country=country,
+            region=country,  # Can be refined later
+            description=teaser
+        )
+
+        # Create recommendation
+        recommendation_id = f"rec-{uuid.uuid4()}"
+        recommendation = DestinationRecommendation(
+            recommendation_id=recommendation_id,
+            user_id=user_id,
+            destination=destination_info,
+            reasoning=f"Selected from brainstorm session with {rating}/3 stars",
+            status="selected",
+            confidence_score=rating / 3.0 if rating else None
+        )
+
+        # Save to database with source tracking
+        data = recommendation.model_dump(mode="json")
+        data["source_conversation_id"] = session_id
+        data["location_proposal_id"] = location_id
+        
+        response = supabase.client.table("destination_recommendations").insert(data).execute()
+
+        print(f"✅ Created recommendation {recommendation_id} from session {session_id}")
+        print(f"   Location: {location_name}, {country}")
+        print(f"   Rating: {rating}/3")
+
+        return {
+            "recommendation_id": recommendation_id,
+            "destination": destination_info.model_dump(),
+            "status": "selected",
+            "message": f"Trip to {location_name} created! Continue planning in Trip View."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR creating recommendation: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sessions/{session_id}/recommendations")
+async def get_session_recommendations(
+    session_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    Get all recommendations/trips created from this brainstorm session
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Get recommendations for this session
+        result = supabase.client.table("destination_recommendations").select("*").eq(
+            "source_conversation_id", session_id
+        ).eq("user_id", user_id).execute()
+
+        recommendations = []
+        for rec in result.data:
+            recommendations.append({
+                "id": rec["recommendation_id"],
+                "destination": rec["destination"],
+                "status": rec["status"],
+                "rating": rec.get("confidence_score"),
+                "createdAt": rec["created_at"],
+                "location_proposal_id": rec.get("location_proposal_id")
+            })
+
+        return {"recommendations": recommendations}
+
+    except Exception as e:
+        print(f"ERROR fetching session recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/session/{session_id}/create_recommendation")
 async def create_recommendation(session_id: str):
-    """Create recommendation for a session"""
+    """Create recommendation for a session (legacy endpoint)"""
     if session_id not in active_agents:
         raise HTTPException(status_code=404, detail="Session not found")
 
