@@ -7,7 +7,7 @@ channel = "stable-25_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
+run = ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port $PORT"]
 
 [workflows]
 runButton = "Project"
@@ -36,7 +36,3 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 37187
-externalPort = 3000
