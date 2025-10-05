@@ -244,7 +244,9 @@ supabase_service = SupabaseService()
 
 def init_supabase():
     """Initialize Supabase service"""
+    print("DEBUG: init_supabase() called")
     supabase_service.init()
+    print(f"DEBUG: Supabase client initialized: {supabase_service.client is not None}")
 
 
 def get_supabase() -> SupabaseService:
