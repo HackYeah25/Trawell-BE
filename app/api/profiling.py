@@ -289,24 +289,20 @@ async def get_profiling_questions():
 
 @router.post("/start")
 async def start_profiling(
-    request: StartProfilingRequest,
+    request: StartProfilingRequest = StartProfilingRequest(),
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ) -> StartProfilingResponse:
-    """Start a new profiling session - requires authentication"""
-    # Require authentication for profiling
-    if not current_user:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required to start profiling"
-        )
+    """Start a new profiling session - authentication optional"""
+    # Support both authenticated and anonymous users
+    # Anonymous users will have user_id = None
 
     try:
         session_id = f"prof_{uuid.uuid4().hex[:12]}"
-        user_id = current_user.get("id")
+        user_id = current_user.get("id") if current_user else None
 
-        # Check if user already has a completed profiling session
+        # Check if user already has a completed profiling session (only for authenticated users)
         supabase = get_supabase()
-        if supabase.client:
+        if supabase.client and user_id:
             existing = supabase.client.table("profiling_sessions").select("id").eq(
                 "user_id", user_id
             ).eq(
@@ -331,7 +327,8 @@ async def start_profiling(
         # Create session in Redis
         await create_session(session)
 
-        print(f"DEBUG: Created profiling session {session_id} for user {user_id}")
+        user_label = user_id if user_id else "anonymous"
+        print(f"DEBUG: Created profiling session {session_id} for user {user_label}")
 
         intro_message = profiling_agent.get_intro_message()
 
