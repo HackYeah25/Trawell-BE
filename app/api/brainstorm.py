@@ -11,7 +11,7 @@ import re
 from datetime import datetime
 
 from app.models.user import UserProfile, UserPreferences, UserConstraints, TokenData
-from app.models.destination import Rating
+from app.models.destination import Rating, DestinationInfo, DestinationRecommendation
 
 from app.services.supabase_service import get_supabase
 from app.agents.brainstorm_agent import BrainstormAgent
@@ -600,26 +600,26 @@ async def create_recommendation_from_location(
         # Create destination info
         destination_info = DestinationInfo(
             name=location_name,
+            city=location_name,  # Use location name as city
             country=country,
             region=country,  # Can be refined later
             description=teaser
         )
 
-        # Create recommendation
-        recommendation_id = f"rec-{uuid.uuid4()}"
-        recommendation = DestinationRecommendation(
-            recommendation_id=recommendation_id,
-            user_id=user_id,
-            destination=destination_info,
-            reasoning=f"Selected from brainstorm session with {rating}/3 stars",
-            status="selected",
-            confidence_score=rating / 3.0 if rating else None
-        )
+        # Create recommendation ID
+        recommendation_id = uuid.uuid4()
 
-        # Save to database with source tracking
-        data = recommendation.model_dump(mode="json")
-        data["source_conversation_id"] = session_id
-        data["location_proposal_id"] = location_id
+        # Prepare data for database (bypassing Pydantic model to match DB schema)
+        data = {
+            "recommendation_id": str(recommendation_id),
+            "user_id": user_id,
+            "destination": destination_info.model_dump(),
+            "reasoning": f"Selected from brainstorm session with {rating}/3 stars",
+            "status": "selected",
+            "confidence_score": float(rating) / 3.0 if rating else None,
+            "source_conversation_id": session_id,
+            "location_proposal_id": location_id,
+        }
         
         response = supabase.client.table("destination_recommendations").insert(data).execute()
 
@@ -628,7 +628,7 @@ async def create_recommendation_from_location(
         print(f"   Rating: {rating}/3")
 
         return {
-            "recommendation_id": recommendation_id,
+            "recommendation_id": str(recommendation_id),
             "destination": destination_info.model_dump(),
             "status": "selected",
             "message": f"Trip to {location_name} created! Continue planning in Trip View."
@@ -678,6 +678,49 @@ async def get_session_recommendations(
 
     except Exception as e:
         print(f"ERROR fetching session recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/recommendations/{recommendation_id}")
+async def get_recommendation_by_id(
+    recommendation_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    Get a specific recommendation by ID (for trip planning view)
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Get recommendation from database
+        result = supabase.client.table("destination_recommendations").select("*").eq(
+            "recommendation_id", recommendation_id
+        ).eq("user_id", user_id).execute()
+
+        if not result.data or len(result.data) == 0:
+            raise HTTPException(status_code=404, detail="Recommendation not found")
+
+        recommendation = result.data[0]
+        
+        return {
+            "recommendation_id": recommendation["recommendation_id"],
+            "destination": recommendation["destination"],
+            "status": recommendation.get("status", "suggested"),
+            "reasoning": recommendation.get("reasoning"),
+            "confidence_score": recommendation.get("confidence_score"),
+            "source_conversation_id": recommendation.get("source_conversation_id"),
+            "created_at": recommendation["created_at"],
+            "updated_at": recommendation["updated_at"]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR fetching recommendation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
