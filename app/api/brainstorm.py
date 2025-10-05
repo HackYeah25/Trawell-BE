@@ -627,6 +627,41 @@ async def create_recommendation_from_location(
         print(f"   Location: {location_name}, {country}")
         print(f"   Rating: {rating}/3")
 
+        # Add trip creation message to conversation history for persistence
+        try:
+            trip_message = {
+                "role": "assistant",
+                "content": f"🎉 **Trip Created!**\n\nYour trip to **{location_name}** has been created successfully! You can now start planning your adventure.",
+                "timestamp": datetime.utcnow().isoformat(),
+                "metadata": {
+                    "type": "trip_created",
+                    "tripId": str(recommendation_id),
+                    "title": f"Trip to {location_name}",
+                    "locationName": location_name,
+                    "imageUrl": location_data.get("imageUrl")
+                }
+            }
+            
+            # Fetch current conversation
+            conv_result = supabase.client.table("conversations").select("messages").eq(
+                "conversation_id", session_id
+            ).execute()
+            
+            if conv_result.data:
+                current_messages = conv_result.data[0].get("messages", [])
+                current_messages.append(trip_message)
+                
+                # Update conversation with new message
+                supabase.client.table("conversations").update({
+                    "messages": current_messages,
+                    "updated_at": datetime.utcnow().isoformat()
+                }).eq("conversation_id", session_id).execute()
+                
+                print(f"✅ Added trip creation message to conversation {session_id}")
+        except Exception as e:
+            print(f"⚠️  Failed to add trip message to conversation: {e}")
+            # Don't fail the whole request if message persistence fails
+
         return {
             "recommendation_id": str(recommendation_id),
             "destination": destination_info.model_dump(),
