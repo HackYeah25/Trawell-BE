@@ -4,39 +4,48 @@ An AI-powered travel planning application that helps users discover destinations
 
 ## 🚀 Features
 
-- **User Profiling**: Conversational AI-based user profiling (not sliders!)
+- **User Profiling**: Conversational AI-based user profiling with LangChain
 - **Destination Discovery**: AI-powered destination suggestions based on user profiles
 - **Trip Planning**: Comprehensive trip plans with weather, POIs, events, and cultural info
 - **Group Brainstorming**: Collaborative destination discovery with multiple users
 - **On-site Support**: Real-time AI assistance while traveling
-- **Deal Monitoring**: Automated flight deal detection and notifications
+- **Technical Details**: Location-specific technical information (weather, timezone, currency, etc.)
+- **Google Places Integration**: Photo retrieval and place information
+- **Amadeus Flight API**: Flight search and booking integration
 
 ## 🏗️ Tech Stack
 
-- **Framework**: FastAPI (Python)
-- **LLM**: LangChain (OpenAI/Anthropic)
+- **Framework**: FastAPI (Python 3.13)
+- **LLM**: LangChain with OpenAI/Anthropic integration
 - **Database**: Supabase (PostgreSQL)
 - **Background Jobs**: Celery + Redis
-- **Deployment**: Docker (ready)
+- **External APIs**: Google Places, Amadeus, Weather services
+- **Deployment**: Docker + Docker Compose
+- **Testing**: pytest with comprehensive test suite
 
 ## 📁 Project Structure
 
 ```
-travel-ai-backend/
+Trawell-BE/
 ├── app/
-│   ├── api/              # API endpoints
-│   ├── chains/           # LangChain chains
-│   ├── prompts/          # YAML prompt files
-│   ├── models/           # Pydantic models
-│   ├── services/         # External services
-│   ├── agents/           # LangChain agents
-│   ├── utils/            # Utilities
-│   ├── background/       # Background jobs
-│   ├── config.py         # Configuration
-│   └── main.py           # FastAPI app
-├── tests/                # Test suite
-├── requirements.txt      # Dependencies
-└── .env.example         # Environment template
+│   ├── api/                    # API endpoints (auth, brainstorm, planning, etc.)
+│   ├── agents/                 # LangChain agents (brainstorm, planning, profiling)
+│   ├── models/                 # Pydantic models (user, destination, trip, etc.)
+│   ├── services/               # External services (Supabase, Google Places, Amadeus)
+│   ├── prompts/                # YAML prompt files (brainstorm, planning, profiling)
+│   ├── utils/                  # Utilities (context manager)
+│   ├── background/             # Background jobs (Celery)
+│   ├── config.py               # Configuration management
+│   └── main.py                 # FastAPI application
+├── tests/                      # Test suite (integration tests)
+├── supabase/                   # Database migrations and seeds
+├── docs/                       # Additional documentation
+├── examples/                    # Example clients and usage
+├── requirements.txt            # Python dependencies
+├── docker-compose.yml          # Docker Compose configuration
+├── Dockerfile                  # Docker image definition
+├── Makefile                    # Development commands
+└── run.sh                      # Quick start script
 ```
 
 ## 🛠️ Setup
@@ -71,74 +80,36 @@ cp .env.example .env
 Required environment variables:
 - `SUPABASE_URL`: Your Supabase project URL
 - `SUPABASE_KEY`: Your Supabase anon key
-- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`: LLM API key
+- `SUPABASE_SERVICE_KEY`: Your Supabase service key (for admin operations)
+- `OPENAI_API_KEY`: OpenAI API key for LLM
+- `ANTHROPIC_API_KEY`: Anthropic API key (optional)
 - `SECRET_KEY`: JWT secret (generate with `openssl rand -hex 32`)
+- `GOOGLE_MAPS_API_KEY`: Google Maps/Places API key
+- `AMADEUS_API_KEY`: Amadeus API key for flight data
+- `AMADEUS_API_SECRET`: Amadeus API secret
+- `WEATHER_API_KEY`: Weather service API key
 
 ### 5. Set up Supabase
 
-Create the following tables in your Supabase project:
+The project includes database migrations in the `supabase/migrations/` directory. Run the migrations:
 
-```sql
--- User profiles
-CREATE TABLE user_profiles (
-  user_id UUID PRIMARY KEY,
-  preferences JSONB,
-  constraints JSONB,
-  past_destinations TEXT[],
-  wishlist_regions TEXT[],
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+```bash
+# Using the migration script
+python run_migration.py
 
--- Conversations
-CREATE TABLE conversations (
-  conversation_id TEXT PRIMARY KEY,
-  user_id UUID REFERENCES user_profiles(user_id),
-  module TEXT,
-  mode TEXT,
-  messages JSONB[],
-  group_participants UUID[],
-  context_summary TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Destination recommendations
-CREATE TABLE destination_recommendations (
-  recommendation_id TEXT PRIMARY KEY,
-  user_id UUID REFERENCES user_profiles(user_id),
-  destination JSONB,
-  reasoning TEXT,
-  optimal_season TEXT,
-  estimated_budget NUMERIC,
-  currency TEXT DEFAULT 'USD',
-  highlights TEXT[],
-  deals_found JSONB[],
-  status TEXT,
-  confidence_score NUMERIC,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Trip plans
-CREATE TABLE trip_plans (
-  trip_id TEXT PRIMARY KEY,
-  user_id UUID REFERENCES user_profiles(user_id),
-  destination JSONB,
-  start_date TIMESTAMP,
-  end_date TIMESTAMP,
-  status TEXT,
-  weather_forecast JSONB[],
-  cultural_info JSONB,
-  points_of_interest JSONB[],
-  local_events JSONB[],
-  daily_itinerary JSONB[],
-  estimated_budget NUMERIC,
-  notes TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+# Or manually run the SQL files
+# 001_group_conversations.sql
+# 002_profiling_sessions.sql  
+# 003_add_logistics_data.sql
 ```
+
+Key tables created:
+- `user_profiles` - User preferences and constraints
+- `conversations` - Chat sessions and messages
+- `destination_recommendations` - AI-generated destination suggestions
+- `trip_plans` - Detailed trip planning data
+- `group_conversations` - Multi-user brainstorming sessions
+- `profiling_sessions` - User profiling conversation data
 
 ### 6. Run the application
 
@@ -201,23 +172,35 @@ Profile Creation → Brainstorm → Planning → On-site Support
 
 ## 🎯 API Endpoints
 
-### Authentication
+### Authentication & Users
 - `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
+- `POST /api/auth/login` - Login user  
+- `GET /api/me` - Get current user profile
+- `PATCH /api/me` - Update user profile
+
+### Profiling
+- `POST /api/profiling/start` - Start user profiling session
+- `POST /api/profiling/{session_id}/message` - Send profiling message
+- `GET /api/profiling/{session_id}/status` - Get profiling status
+- `POST /api/profiling/{session_id}/complete` - Complete profiling
 
 ### Brainstorm
-- `POST /api/brainstorm/start` - Start brainstorm session
-- `POST /api/brainstorm/{id}/message` - Send message
-- `GET /api/brainstorm/{id}/suggestions` - Get suggestions
-- `POST /api/brainstorm/{id}/group/invite` - Invite to group
+- `GET /api/brainstorm/sessions` - List brainstorm sessions
+- `POST /api/brainstorm/sessions` - Create new session
+- `GET /api/brainstorm/sessions/{session_id}` - Get session details
+- `POST /api/brainstorm/sessions/{session_id}/recommendations` - Create recommendation
+- `GET /api/brainstorm/sessions/{session_id}/recommendations` - Get recommendations
+- `DELETE /api/brainstorm/sessions/{session_id}` - Delete session
+
+### Group Brainstorm
+- `POST /api/group-brainstorm/create` - Create group session
+- `POST /api/group-brainstorm/{session_id}/join` - Join group session
+- `POST /api/group-brainstorm/{session_id}/message` - Send group message
 
 ### Planning
-- `POST /api/planning/create` - Create trip plan
-- `GET /api/planning/{id}` - Get trip details
-- `POST /api/planning/{id}/flights` - Search flights
-- `POST /api/planning/{id}/weather` - Get weather
-- `POST /api/planning/{id}/poi` - Get points of interest
-- `POST /api/planning/{id}/events` - Get local events
+- `GET /api/planning/technical-details` - Get location technical details
+- `GET /api/planning/recommendations/{recommendation_id}/summary` - Get trip summary
+- `WS /api/planning/ws/{recommendation_id}` - Real-time planning WebSocket
 
 ### Support
 - `POST /api/support/{trip_id}/chat` - On-site chat
@@ -230,12 +213,18 @@ Profile Creation → Brainstorm → Planning → On-site Support
 ## 🧪 Testing
 
 ```bash
-# Run tests
-pytest
-
-# With coverage
-pytest --cov=app tests/
+# Run all tests
+python tests/test_supabase_connection.py
+python tests/test_amadeus_integration.py  
+python tests/test_google_places_service.py
+python tests/test_get_technical_details.py
 ```
+
+Available test suites:
+- **Supabase Connection** - Database connectivity and operations
+- **Amadeus Integration** - Flight API authentication and search
+- **Google Places** - Place search and photo retrieval
+- **Technical Details** - Planning API prompt system
 
 ## 🐳 Docker Deployment
 
@@ -247,25 +236,46 @@ docker build -t travel-ai-backend .
 docker run -p 8000:8000 --env-file .env travel-ai-backend
 ```
 
-## 📝 Development Phases
+## 📝 Development Status
 
-- [x] Phase 1: Foundation (FastAPI, Supabase, LangChain)
-- [ ] Phase 2: Brainstorm Module
-- [ ] Phase 3: Planning Module
-- [ ] Phase 4: Group Features
-- [ ] Phase 5: On-site Support & Background Jobs
+- [x] **Foundation** - FastAPI, Supabase, LangChain integration
+- [x] **User Profiling** - Conversational AI-based user profiling system
+- [x] **Brainstorm Module** - AI-powered destination discovery
+- [x] **Group Brainstorm** - Collaborative destination discovery
+- [x] **Planning Module** - Trip planning with technical details
+- [x] **External APIs** - Google Places, Amadeus, Weather integration
+- [x] **Testing Suite** - Comprehensive integration tests
+- [x] **Docker Setup** - Production-ready containerization
+- [ ] **On-site Support** - Real-time travel assistance
+- [ ] **Background Jobs** - Automated deal monitoring
 
-## 🤝 Contributing
+## 🚀 Quick Start
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Write tests
-5. Submit a pull request
+```bash
+# Clone and setup
+git clone <repository-url>
+cd Trawell-BE
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
 
-## 📄 License
+# Configure environment
+cp .env.example .env
+# Edit .env with your API keys
 
-[Your License Here]
+# Run migrations
+python run_migration.py
+
+
+
+## 📚 Additional Documentation
+
+- [QUICKSTART.md](QUICKSTART.md) - Detailed quick start guide
+- [API.md](API.md) - Complete API reference
+- [DOCKER.md](DOCKER.md) - Docker deployment guide
+- [PROFILING_SYSTEM.md](PROFILING_SYSTEM.md) - User profiling system
+- [GROUP_BRAINSTORM.md](docs/GROUP_BRAINSTORM.md) - Group features
+
 
 ## 🙋 Support
 
