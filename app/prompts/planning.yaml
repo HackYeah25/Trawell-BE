@@ -12,6 +12,9 @@ trip_planning_system: |
   - Include practical tips and insider knowledge
   - Warn about common tourist traps or issues
   - Suggest optimal routes and timing
+  - Use available logistics data (flights, hotels, weather) to provide context-aware recommendations
+  - Reference specific flight/hotel options when discussing budget and timing
+  - Tailor packing suggestions based on the weather forecast data
 
 trip_planning_prompt: |
   Create a detailed trip plan for:
@@ -180,3 +183,67 @@ customize_itinerary: |
   - Realistic timing
   - Budget considerations
   - User's original preferences
+
+location_technical_details: |
+  Provide comprehensive technical details for {destination}.
+
+  You must respond with a valid JSON object containing the following fields:
+
+  {{
+    "weather": "Current weather conditions and seasonal patterns for {destination}",
+    "timezone": "Timezone information for {destination} (e.g., UTC+1, EST, etc.)",
+    "currency": "Official currency used in {destination}",
+    "language": "Primary language(s) spoken in {destination}",
+    "climate": "Climate type and general weather patterns for {destination}",
+    "safety": "Safety considerations and travel advisories for {destination}"
+  }}
+
+  Requirements:
+  - Return ONLY valid JSON, no additional text
+  - Use accurate, up-to-date information
+  - Be specific to the destination provided
+  - Include practical details travelers need to know
+  - For weather: mention current season and typical conditions
+  - For timezone: include UTC offset and time zone name
+  - For currency: include currency code and symbol
+  - For language: mention official and commonly spoken languages
+  - For climate: describe seasonal variations and best times to visit
+  - For safety: include any relevant travel advisories or safety tips
+  - Focus strictly on the specific answer for the json values
+  - Keep the answer values to maximum two words
+
+location_additional_details: |
+  Provide additional details for {destination}.
+
+  You must respond with a valid JSON object containing the following fields:
+
+  {{
+    "additional_details": "Additional details for {destination}"
+  }}
+  
+  Requirements:
+  - Return ONLY valid JSON, no additional text
+  - Use accurate, up-to-date information
+  - Be specific to the destination provided
+  - Include practical details travelers need to know
+  - Focus strictly on the specific answer for the json values
+  - Keep the answer value in human readable format
+  - Limit your answer value to very short and concise sentences
+  - Limit your answer to a maximum of 5 sentences
+
+planning_opening_with_logistics: |
+  Great! I have all the information I need to help you plan your trip to {destination}.
+  
+  I've gathered some key logistics data to help us plan:
+  
+  **Flight Options:**
+  {flight_summary}
+  
+  **Accommodation Options:**
+  {hotel_summary}
+  
+  **Weather Forecast:**
+  {weather_summary}
+  
+  Now, to create the perfect itinerary for you, I'd love to know: What's most important to you for this trip? 
+  Are you looking to relax, explore cultural sites, try local cuisine, or perhaps a mix of everything?

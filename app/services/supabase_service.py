@@ -10,7 +10,7 @@ from postgrest.exceptions import APIError
 from app.config import settings
 from app.models.user import UserProfile, User
 from app.models.conversation import Conversation, Message
-from app.models.destination import DestinationRecommendation
+from app.models.destination import DestinationRecommendation, Rating
 from app.models.trip import TripPlan
 
 
@@ -37,6 +37,41 @@ class SupabaseService:
             self.client = None
 
     # User Profile Operations
+    async def get_user(self, user_id: str) -> Optional[User]:
+        """Fetch user and map to API User: {id, name, email?, onboardingCompleted}."""
+        if not self.client:
+            raise Exception("Supabase client not initialized")
+        try:
+            response = self.client.table("users").select("*").eq("id", user_id).execute()
+            if response.data:
+                return User(**response.data[0])
+            return None
+        except Exception as e:
+            raise Exception(f"Error fetching user: {str(e)}")
+
+    async def update_user(self, user_id: str, fields: Dict[str, Any]) -> User:
+        """Update user with whatever fields are provided; returns updated User."""
+        if not self.client:
+            raise Exception("Supabase client not initialized")
+        try:
+            update_payload: Dict[str, Any] = {k: v for k, v in fields.items() if v is not None}
+
+            if not update_payload:
+                user = await self.get_user(user_id)
+                if not user:
+                    raise Exception("User not found")
+                return user
+
+            update_payload["updated_at"] = datetime.utcnow().isoformat()
+            self.client.table("users").update(update_payload).eq("id", user_id).execute()
+
+            user = await self.get_user(user_id)
+            if not user:
+                raise Exception("User not found after update")
+            return user
+        except Exception as e:
+            raise Exception(f"Error updating user: {str(e)}")
+
     async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
         """Fetch user profile by user_id"""
         if not self.client:
@@ -119,36 +154,7 @@ class SupabaseService:
             return [Conversation(**conv) for conv in response.data]
         except Exception as e:
             raise Exception(f"Error fetching user conversations: {str(e)}")
-
-    # Destination Recommendation Operations
-    async def save_recommendation(self, recommendation: DestinationRecommendation) -> DestinationRecommendation:
-        """Save destination recommendation"""
-        try:
-            data = recommendation.model_dump(mode="json")
-            response = self.client.table("destination_recommendations").insert(data).execute()
-            return DestinationRecommendation(**response.data[0])
-        except Exception as e:
-            raise Exception(f"Error saving recommendation: {str(e)}")
-
-    async def get_user_recommendations(self, user_id: str) -> List[DestinationRecommendation]:
-        """Get all recommendations for a user"""
-        try:
-            response = self.client.table("destination_recommendations").select("*").eq("user_id", user_id).execute()
-            return [DestinationRecommendation(**rec) for rec in response.data]
-        except Exception as e:
-            raise Exception(f"Error fetching recommendations: {str(e)}")
-
-    async def update_recommendation_status(self, recommendation_id: str, status: str) -> DestinationRecommendation:
-        """Update recommendation status"""
-        try:
-            response = self.client.table("destination_recommendations").update({
-                "status": status,
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("recommendation_id", recommendation_id).execute()
-            return DestinationRecommendation(**response.data[0])
-        except Exception as e:
-            raise Exception(f"Error updating recommendation status: {str(e)}")
-
+            
     # Trip Plan Operations
     async def create_trip_plan(self, trip: TripPlan) -> TripPlan:
         """Create new trip plan"""

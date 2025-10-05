@@ -119,6 +119,146 @@ async def get_conversation(session_id: str) -> List[ProfilingMessage]:
 
 
 # API Endpoints
+@router.get("/status")
+async def check_profile_status(
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    Check if user has completed profiling by looking at profiling_sessions table
+
+    A user is considered "profiled" if they have ANY completed profiling session,
+    regardless of whether user_profiles table has data.
+
+    Returns:
+        has_completed_profiling: bool - Whether user has completed profiling
+        should_skip_onboarding: bool - Whether to skip onboarding flow
+        profile_completeness: float - Completeness percentage (0-100)
+        last_session_id: str - ID of most recent completed session (if any)
+    """
+    # Anonymous users - no completed profiling
+    if not current_user:
+        return {
+            "has_completed_profiling": False,
+            "should_skip_onboarding": False,
+            "profile_completeness": 0,
+            "last_session_id": None,
+            "user_id": None
+        }
+
+    user_id = current_user.get("id")
+    supabase = get_supabase()
+
+    try:
+        # Check profiling_sessions table for completed sessions
+        if supabase.client:
+            result = supabase.client.table("profiling_sessions").select("*").eq(
+                "user_id", user_id
+            ).eq(
+                "status", "completed"
+            ).order(
+                "completed_at", desc=True
+            ).limit(1).execute()
+
+            if result.data and len(result.data) > 0:
+                # User has at least one completed profiling session
+                session = result.data[0]
+                return {
+                    "has_completed_profiling": True,
+                    "should_skip_onboarding": True,
+                    "profile_completeness": session.get("profile_completeness", 1.0) * 100,
+                    "last_session_id": session["session_id"],
+                    "completed_at": session.get("completed_at"),
+                    "user_id": user_id
+                }
+            else:
+                # Check if user has any in-progress session
+                in_progress = supabase.client.table("profiling_sessions").select("*").eq(
+                    "user_id", user_id
+                ).eq(
+                    "status", "in_progress"
+                ).order(
+                    "updated_at", desc=True
+                ).limit(1).execute()
+
+                if in_progress.data and len(in_progress.data) > 0:
+                    session = in_progress.data[0]
+                    return {
+                        "has_completed_profiling": False,
+                        "should_skip_onboarding": False,
+                        "profile_completeness": session.get("profile_completeness", 0) * 100,
+                        "last_session_id": session["session_id"],
+                        "status": "in_progress",
+                        "user_id": user_id
+                    }
+                else:
+                    # No profiling sessions at all
+                    return {
+                        "has_completed_profiling": False,
+                        "should_skip_onboarding": False,
+                        "profile_completeness": 0,
+                        "last_session_id": None,
+                        "user_id": user_id
+                    }
+        else:
+            raise Exception("Supabase client not initialized")
+
+    except Exception as e:
+        print(f"ERROR checking profile status: {e}")
+        return {
+            "has_completed_profiling": False,
+            "should_skip_onboarding": False,
+            "profile_completeness": 0,
+            "error": str(e),
+            "user_id": user_id
+        }
+
+
+@router.delete("/profile/reset")
+async def reset_user_profile(
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    Reset user profile - deletes profile from database
+    Allows user to go through onboarding again
+
+    Returns:
+        success: bool
+        message: str
+    """
+    TEST_USER_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+
+    # Allow test user even without auth for development
+    if not current_user:
+        user_id = TEST_USER_ID
+        print(f"DEBUG: No auth, using test user_id for reset: {user_id}")
+    else:
+        user_id = current_user.get("id") or TEST_USER_ID
+
+    supabase = get_supabase()
+
+    try:
+        # Delete user profile from database
+        if supabase.client:
+            # Delete from user_profiles table
+            supabase.client.table("user_profiles").delete().eq("user_id", user_id).execute()
+
+            # Also delete any profiling sessions
+            supabase.client.table("profiling_sessions").delete().eq("user_id", user_id).execute()
+
+            print(f"✅ Deleted profile for user {user_id}")
+            return {
+                "success": True,
+                "message": "Profile reset successfully. You can now complete onboarding again.",
+                "user_id": user_id
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+    except Exception as e:
+        print(f"ERROR resetting profile: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset profile: {str(e)}")
+
+
 @router.get("/questions")
 async def get_profiling_questions():
     """Get all profiling questions (for frontend to display)"""
@@ -142,34 +282,40 @@ async def start_profiling(
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ) -> StartProfilingResponse:
     """Start a new profiling session"""
-    session_id = f"prof_{uuid.uuid4().hex[:12]}"
-    user_id = request.user_id or (current_user.get("id") if current_user else None)
+    try:
+        session_id = f"prof_{uuid.uuid4().hex[:12]}"
+        user_id = request.user_id or (current_user.get("id") if current_user else None)
 
-    session = ProfilingSession(
-        session_id=session_id,
-        user_id=user_id,
-        status=ProfilingStatus.IN_PROGRESS,
-        current_question_index=0,
-        responses=[],
-        profile_completeness=0.0,
-    )
+        session = ProfilingSession(
+            session_id=session_id,
+            user_id=user_id,
+            status=ProfilingStatus.IN_PROGRESS,
+            current_question_index=0,
+            responses=[],
+            profile_completeness=0.0,
+        )
 
-    # Create session in Redis
-    await create_session(session)
+        # Create session in Redis
+        await create_session(session)
 
-    print(f"DEBUG: Created session {session_id}, total sessions: Redis")
+        print(f"DEBUG: Created session {session_id}, total sessions: Redis")
 
-    intro_message = profiling_agent.get_intro_message()
+        intro_message = profiling_agent.get_intro_message()
 
-    # Add intro message to conversation
-    intro_msg = ProfilingMessage(role="assistant", content=intro_message)
-    await add_message_to_conversation(session_id, intro_msg)
+        # Add intro message to conversation
+        intro_msg = ProfilingMessage(role="assistant", content=intro_message)
+        await add_message_to_conversation(session_id, intro_msg)
 
-    websocket_url = f"/api/profiling/ws/{session_id}"
+        websocket_url = f"/api/profiling/ws/{session_id}"
 
-    return StartProfilingResponse(
-        session=session, first_message=intro_message, websocket_url=websocket_url
-    )
+        return StartProfilingResponse(
+            session=session, first_message=intro_message, websocket_url=websocket_url
+        )
+    except Exception as e:
+        print(f"ERROR: Failed to start profiling session: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to start profiling session: {str(e)}")
 
 
 @router.get("/session/{session_id}")
@@ -433,7 +579,11 @@ async def process_sufficient_answer(
         supabase = get_supabase()
         if supabase.client and session.user_id:
             try:
-                await supabase.create_user_profile(user_profile)
+                existing = await supabase.get_user_profile(session.user_id)
+                if existing:
+                    await supabase.update_user_profile(session.user_id, user_profile)
+                else:
+                    await supabase.create_user_profile(user_profile)
             except Exception as e:
                 print(f"Error saving profile: {e}")
 
