@@ -81,7 +81,7 @@ def get_prompt_loader_dep() -> PromptLoader:
 # Optional user dependency (for public endpoints)
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional)
-) -> Optional[TokenData]:
+) -> Optional[dict]:
     """
     Get current user if authenticated, None otherwise
 
@@ -89,12 +89,14 @@ async def get_current_user_optional(
         credentials: Optional HTTP Bearer token
 
     Returns:
-        Token data if authenticated, None otherwise
+        User dict with id and email if authenticated, None otherwise
     """
     if credentials is None:
         return None
 
     try:
-        return await get_current_user(credentials)
+        token_data = await get_current_user(credentials)
+        # Return dict format for consistency with profiling endpoints
+        return {"id": token_data.user_id, "email": token_data.email}
     except HTTPException:
         return None

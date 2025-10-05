@@ -73,7 +73,12 @@ class SupabaseService:
             raise Exception(f"Error updating user: {str(e)}")
 
     async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
-        """Fetch user profile by user_id"""
+        """
+        Fetch user profile by user_id
+        
+        Returns None if profile doesn't exist - caller must handle this case.
+        No fallback profiles are provided.
+        """
         if not self.client:
             raise Exception("Supabase client not initialized")
         try:
@@ -82,7 +87,23 @@ class SupabaseService:
                 return UserProfile(**response.data[0])
             return None
         except Exception as e:
+            print(f"Error fetching user profile for {user_id}: {e}")
             raise Exception(f"Error fetching user profile: {str(e)}")
+
+    async def has_completed_profiling(self, user_id: str) -> bool:
+        """Check if user has completed profiling"""
+        if not self.client:
+            raise Exception("Supabase client not initialized")
+        try:
+            response = self.client.table("profiling_sessions").select("id").eq(
+                "user_id", user_id
+            ).eq(
+                "status", "completed"
+            ).limit(1).execute()
+            return bool(response.data)
+        except Exception as e:
+            print(f"Error checking profiling status for {user_id}: {e}")
+            return False
 
     async def create_user_profile(self, profile: UserProfile) -> UserProfile:
         """Create new user profile"""

@@ -183,28 +183,17 @@ async def planning_websocket(
         ).execute()
         
         if not profile_result.data or len(profile_result.data) == 0:
-            # Fallback test profile (same as brainstorm)
-            print(f"⚠️ No profile found for {user_id}, using fallback test profile")
-            user_profile = UserProfile(
-                user_id=user_id,
-                preferences=UserPreferences(
-                    traveler_type="explorer",
-                    activity_level="high",
-                    accommodation_style="boutique",
-                    environment="mixed",
-                    budget_sensitivity="medium",
-                    culture_interest="high",
-                    food_importance="high"
-                ),
-                constraints=UserConstraints()
-            )
-        else:
-            profile_data = profile_result.data[0]
-            user_profile = UserProfile(
-                user_id=profile_data["user_id"],
-                preferences=UserPreferences(**profile_data.get("preferences", {})),
-                constraints=UserConstraints(**profile_data.get("constraints", {}))
-            )
+            # No fallback - user must complete profiling first
+            print(f"❌ No profile found for user {user_id}")
+            await websocket.close(code=1008, reason="User profile not found. Please complete profiling first.")
+            return
+        
+        profile_data = profile_result.data[0]
+        user_profile = UserProfile(
+            user_id=profile_data["user_id"],
+            preferences=UserPreferences(**profile_data.get("preferences", {})),
+            constraints=UserConstraints(**profile_data.get("constraints", {}))
+        )
         
         # Build DestinationRecommendation object
         destination = DestinationInfo(**rec_data["destination"])

@@ -220,20 +220,19 @@ async def reset_user_profile(
     """
     Reset user profile - deletes profile from database
     Allows user to go through onboarding again
+    Requires authentication
 
     Returns:
         success: bool
         message: str
     """
-    TEST_USER_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-
-    # Allow test user even without auth for development
     if not current_user:
-        user_id = TEST_USER_ID
-        print(f"DEBUG: No auth, using test user_id for reset: {user_id}")
-    else:
-        user_id = current_user.get("id") or TEST_USER_ID
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required to reset profile"
+        )
 
+    user_id = current_user.get("id")
     supabase = get_supabase()
 
     try:
@@ -242,10 +241,22 @@ async def reset_user_profile(
             # Delete from user_profiles table
             supabase.client.table("user_profiles").delete().eq("user_id", user_id).execute()
 
-            # Also delete any profiling sessions
+            # Delete profiling responses
+            supabase.client.table("profiling_responses").delete().in_(
+                "session_id",
+                supabase.client.table("profiling_sessions").select("session_id").eq("user_id", user_id)
+            ).execute()
+
+            # Delete profiling messages
+            supabase.client.table("profiling_messages").delete().in_(
+                "session_id",
+                supabase.client.table("profiling_sessions").select("session_id").eq("user_id", user_id)
+            ).execute()
+
+            # Delete profiling sessions
             supabase.client.table("profiling_sessions").delete().eq("user_id", user_id).execute()
 
-            print(f"✅ Deleted profile for user {user_id}")
+            print(f"✅ Deleted profile and profiling data for user {user_id}")
             return {
                 "success": True,
                 "message": "Profile reset successfully. You can now complete onboarding again.",
@@ -281,10 +292,32 @@ async def start_profiling(
     request: StartProfilingRequest,
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ) -> StartProfilingResponse:
-    """Start a new profiling session"""
+    """Start a new profiling session - requires authentication"""
+    # Require authentication for profiling
+    if not current_user:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required to start profiling"
+        )
+
     try:
         session_id = f"prof_{uuid.uuid4().hex[:12]}"
-        user_id = request.user_id or (current_user.get("id") if current_user else None)
+        user_id = current_user.get("id")
+
+        # Check if user already has a completed profiling session
+        supabase = get_supabase()
+        if supabase.client:
+            existing = supabase.client.table("profiling_sessions").select("id").eq(
+                "user_id", user_id
+            ).eq(
+                "status", "completed"
+            ).limit(1).execute()
+
+            if existing.data:
+                raise HTTPException(
+                    status_code=400,
+                    detail="User has already completed profiling. Use reset endpoint to start over."
+                )
 
         session = ProfilingSession(
             session_id=session_id,
@@ -298,7 +331,7 @@ async def start_profiling(
         # Create session in Redis
         await create_session(session)
 
-        print(f"DEBUG: Created session {session_id}, total sessions: Redis")
+        print(f"DEBUG: Created profiling session {session_id} for user {user_id}")
 
         intro_message = profiling_agent.get_intro_message()
 
@@ -311,6 +344,8 @@ async def start_profiling(
         return StartProfilingResponse(
             session=session, first_message=intro_message, websocket_url=websocket_url
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"ERROR: Failed to start profiling session: {e}")
         import traceback

@@ -313,30 +313,13 @@ async def brainstorm_websocket(
 
             conversation = result.data[0]
 
-            # Get user profile
+            # Get user profile - REQUIRED
             user_profile = await supabase.get_user_profile(conversation["user_id"])
             if not user_profile:
-                # Use test profile for development (same as session creation)
-                print(f"⚠️  No profile for user {conversation['user_id']}, using test profile")
-                user_profile = UserProfile(
-                    user_id=conversation["user_id"],
-                    preferences=UserPreferences(
-                        traveler_type="explorer",
-                        activity_level="high",
-                        environment="mixed",
-                        accommodation_style="boutique",
-                        budget_sensitivity="medium",
-                        culture_interest="high",
-                        food_importance="high"
-                    ),
-                    constraints=UserConstraints(
-                        dietary_restrictions=[],
-                        climate_preferences=["mild_temperate", "hot_tropical"],
-                        language_preferences=[]
-                    ),
-                    wishlist_regions=["Southeast Asia", "Iceland"],
-                    past_destinations=["Paris", "Barcelona"]
-                )
+                # No fallback - user must complete profiling first
+                print(f"❌ No profile found for user {conversation['user_id']}")
+                await websocket.close(code=1008, reason="User profile not found. Please complete profiling first.")
+                return
 
             # Rehydrate agent with conversation history
             agent = BrainstormAgent(user_profile)
