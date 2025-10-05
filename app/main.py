@@ -123,16 +123,29 @@ app = FastAPI(
 )
 
 # CORS Middleware
-# In development, allow all localhost ports
+# In development, allow configured origins or wildcard
+# Note: For cloud environments (Replit, etc.) that proxy requests,
+# specific origins must be configured in ALLOWED_ORIGINS env var
 if settings.is_development:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r"http://localhost:\d+",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
+    # If specific origins are configured, use them; otherwise allow all
+    if settings.allowed_origins == "*":
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=["*"],
+        )
+    else:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.allowed_origins_list,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=["*"],
+        )
 else:
     app.add_middleware(
         CORSMiddleware,
