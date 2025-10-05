@@ -100,18 +100,22 @@ travel-ai-backend/
 2. **Port Configuration**
    - Changed default port from 8000 to 5000 for Replit compatibility
    - Updated server URLs in API documentation
+   - Fixed deployment configuration to explicitly specify port 5000
    
 3. **CORS Configuration**
    - Set to allow all origins without credentials for development
    - Configured for Replit's iframe preview environment
    
 4. **Service Fixes**
+   - Implemented lazy initialization for Supabase service
+   - Removed blocking database initialization from application startup
    - Fixed AmadeusService initialization to allow lazy credential validation
    - Prevents import errors when optional API credentials are not configured
    
 5. **Deployment**
-   - Configured autoscale deployment for production
-   - Set up workflow for automatic server startup
+   - Configured autoscale deployment for production: `uvicorn app.main:app --host 0.0.0.0 --port 5000`
+   - Set up workflow for automatic server startup with hot reload
+   - Fast startup with no blocking operations for instant health checks
 
 ## API Endpoints
 
