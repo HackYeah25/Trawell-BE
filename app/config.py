@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     weather_api_key: str = Field(default="", description="Weather API key")
     google_maps_api_key: str = Field(default="", description="Google Maps API key")
     google_flights_api_key: str = Field(default="", description="Google Flights API key")
+    google_places_api_key: str = Field(default="", description="Google Places API key")
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
