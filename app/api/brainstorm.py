@@ -3,7 +3,7 @@ Brainstorm API v2 - Database-persisted brainstorm sessions
 Creates conversations in DB with LangChain memory
 """
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 import uuid
 import asyncio
 import json
