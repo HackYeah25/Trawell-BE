@@ -1,0 +1,249 @@
+# Planning module prompts
+
+trip_planning_system: |
+  You are a meticulous trip planning expert. Your role is to create comprehensive,
+  practical trip plans that help users make the most of their destination.
+
+  Guidelines:
+  - Provide accurate, up-to-date information
+  - Be realistic about timing and logistics
+  - Consider the user's energy levels and preferences
+  - Balance popular attractions with hidden gems
+  - Include practical tips and insider knowledge
+  - Warn about common tourist traps or issues
+  - Suggest optimal routes and timing
+  - Use available logistics data (flights, hotels, weather) to provide context-aware recommendations
+  - Reference specific flight/hotel options when discussing budget and timing
+  - Tailor packing suggestions based on the weather forecast data
+
+trip_planning_prompt: |
+  Create a detailed trip plan for:
+
+  Destination: {destination}
+  Dates: {start_date} to {end_date}
+  Duration: {duration} days
+
+  User profile preferences:
+  {user_preferences}
+
+  Include:
+  1. Daily itinerary suggestions (flexible, not rigid)
+  2. Must-see attractions aligned with user interests
+  3. Restaurant and food recommendations
+  4. Practical logistics (transport, tickets, reservations)
+  5. Timing and pacing recommendations
+  6. Weather-dependent backup options
+  7. Budget estimates
+
+weather_analysis: |
+  Analyze weather for {destination} from {start_date} to {end_date}.
+
+  Provide:
+  - Day-by-day forecast (temperature, conditions, precipitation)
+  - What to pack
+  - Weather-appropriate activity suggestions
+  - Indoor alternatives if needed
+
+cultural_guidelines: |
+  Provide cultural information for {destination}:
+
+  Include:
+  - Dress code considerations (religious sites, general norms)
+  - Important customs and etiquette
+  - Tipping practices
+  - Greetings and basic phrases
+  - Dining etiquette
+  - What to avoid/what not to do
+  - Vaccination requirements
+  - Visa requirements for {user_nationality}
+  - Safety tips
+  - Emergency contacts and numbers
+
+poi_discovery: |
+  Suggest points of interest in {destination} matching this profile:
+
+  Interests: {user_interests}
+  Activity level: {activity_level}
+  Budget: {budget_level}
+
+  For each POI provide:
+  - Name and category
+  - Why it matches the user's interests
+  - Opening hours and best time to visit
+  - Ticket prices (note any free days)
+  - Estimated time needed
+  - Pro tips and insider knowledge
+  - How to get there
+
+events_search: |
+  Find local events in {destination} during {travel_dates}:
+
+  Look for:
+  - Festivals and cultural events
+  - Concerts and performances
+  - Sports events
+  - Special exhibitions
+  - Local markets
+  - Seasonal celebrations
+
+  Consider the user's interests: {user_interests}
+
+itinerary_day_template: |
+  Day {day_number} - {date}
+
+  Weather: {weather_summary}
+
+  Morning:
+  {morning_activities}
+
+  Afternoon:
+  {afternoon_activities}
+
+  Evening:
+  {evening_activities}
+
+  Notes: {special_notes}
+
+  Estimated budget for the day: {day_budget}
+
+flight_search_prompt: |
+  Search for flights:
+
+  From: {origin}
+  To: {destination}
+  Departure: {departure_date}
+  Return: {return_date}
+  Passengers: {passengers}
+  Class: {cabin_class}
+
+  Find the best options considering:
+  - Price
+  - Duration
+  - Number of stops
+  - Departure/arrival times
+  - Airlines (note any budget carriers)
+
+  Provide top 3-5 options with pros/cons.
+
+accommodation_suggestions: |
+  Suggest accommodations in {destination} for:
+
+  Budget: {budget_level}
+  Style preference: {accommodation_style}
+  Location priorities: {location_preferences}
+  Dates: {dates}
+
+  For each suggestion:
+  - Name and type
+  - Location and neighborhood vibe
+  - Why it fits their profile
+  - Estimated price
+  - Pros and cons
+  - Booking tips
+
+local_transport: |
+  Provide local transportation guide for {destination}:
+
+  Include:
+  - Public transport options (metro, bus, tram)
+  - Transport cards or passes worth buying
+  - Taxi/ride-share apps and average costs
+  - Bike rentals or walking recommendations
+  - Day trip transportation
+  - What to avoid
+  - Cost estimates
+
+budget_breakdown: |
+  Create budget breakdown for {destination} trip:
+
+  Duration: {duration} days
+  Travelers: {traveler_count}
+  Style: {budget_level}
+
+  Breakdown:
+  - Flights: {flight_estimate}
+  - Accommodation: {accommodation_estimate}
+  - Food: {food_estimate}
+  - Activities: {activities_estimate}
+  - Transport: {transport_estimate}
+  - Miscellaneous: {misc_estimate}
+
+  Total: {total_estimate}
+
+  Include money-saving tips!
+
+customize_itinerary: |
+  The user wants to customize their itinerary:
+
+  Current itinerary: {current_itinerary}
+  User's request: {customization_request}
+
+  Adjust the plan accordingly while maintaining:
+  - Logical flow and pacing
+  - Realistic timing
+  - Budget considerations
+  - User's original preferences
+
+location_technical_details: |
+  Provide comprehensive technical details for {destination}.
+
+  You must respond with a valid JSON object containing the following fields:
+
+  {{
+    "weather": "Current weather conditions and seasonal patterns for {destination}",
+    "timezone": "Timezone information for {destination} (e.g., UTC+1, EST, etc.)",
+    "currency": "Official currency used in {destination}",
+    "language": "Primary language(s) spoken in {destination}",
+    "climate": "Climate type and general weather patterns for {destination}",
+    "safety": "Safety considerations and travel advisories for {destination}"
+  }}
+
+  Requirements:
+  - Return ONLY valid JSON, no additional text
+  - Use accurate, up-to-date information
+  - Be specific to the destination provided
+  - Include practical details travelers need to know
+  - For weather: mention current season and typical conditions
+  - For timezone: include UTC offset and time zone name
+  - For currency: include currency code and symbol
+  - For language: mention official and commonly spoken languages
+  - For climate: describe seasonal variations and best times to visit
+  - For safety: include any relevant travel advisories or safety tips
+  - Focus strictly on the specific answer for the json values
+  - Keep the answer values to maximum two words
+
+location_additional_details: |
+  Provide additional details for {destination}.
+
+  You must respond with a valid JSON object containing the following fields:
+
+  {{
+    "additional_details": "Additional details for {destination}"
+  }}
+  
+  Requirements:
+  - Return ONLY valid JSON, no additional text
+  - Use accurate, up-to-date information
+  - Be specific to the destination provided
+  - Include practical details travelers need to know
+  - Focus strictly on the specific answer for the json values
+  - Keep the answer value in human readable format
+  - Limit your answer value to very short and concise sentences
+  - Limit your answer to a maximum of 5 sentences
+
+planning_opening_with_logistics: |
+  Great! I have all the information I need to help you plan your trip to {destination}.
+  
+  I've gathered some key logistics data to help us plan:
+  
+  **Flight Options:**
+  {flight_summary}
+  
+  **Accommodation Options:**
+  {hotel_summary}
+  
+  **Weather Forecast:**
+  {weather_summary}
+  
+  Now, to create the perfect itinerary for you, I'd love to know: What's most important to you for this trip? 
+  Are you looking to relax, explore cultural sites, try local cuisine, or perhaps a mix of everything?

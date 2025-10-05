@@ -1,0 +1,944 @@
+"""
+Brainstorm API v2 - Database-persisted brainstorm sessions
+Creates conversations in DB with LangChain memory
+"""
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from typing import Dict, Optional, List, Any
+import uuid
+import asyncio
+import json
+import re
+from datetime import datetime
+
+from app.models.user import UserProfile, UserPreferences, UserConstraints, TokenData
+from app.models.destination import Rating, DestinationInfo, DestinationRecommendation
+
+from app.services.supabase_service import get_supabase
+from app.agents.brainstorm_agent import BrainstormAgent
+from app.api.deps import get_current_user_optional
+
+router = APIRouter(prefix="/api/brainstorm", tags=["brainstorm"])
+
+# In-memory storage for active agents (rehydrated from DB on reconnect)
+active_agents: Dict[str, BrainstormAgent] = {}
+
+# Test user ID for development
+TEST_USER_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+
+
+def extract_location_proposals(text: str) -> tuple[str, Optional[List[Dict]]]:
+    """
+    Extract location proposals from <locations> XML tags
+    
+    Args:
+        text: Response text potentially containing <locations> tags
+        
+    Returns:
+        Tuple of (cleaned_text, locations_list)
+        - cleaned_text: Text with <locations> tags removed
+        - locations_list: Parsed JSON array of locations, or None if not found
+    """
+    print(f"\n{'='*80}")
+    print(f"🔍 LOCATION EXTRACTION - Analyzing response (length: {len(text)} chars)")
+    print(f"{'='*80}")
+    
+    # Show first 200 chars of response
+    preview = text[:200].replace('\n', ' ')
+    print(f"📝 Response preview: {preview}...")
+    
+    # Find <locations> tags
+    pattern = r'<locations>\s*(\[[\s\S]*?\])\s*</locations>'
+    match = re.search(pattern, text)
+    
+    if not match:
+        print(f"❌ NO LOCATION TAGS FOUND in response")
+        print(f"   Searched for pattern: <locations>[...]</locations>")
+        
+        # Check if "location" appears anywhere to help debug
+        if 'location' in text.lower():
+            print(f"   ℹ️  Found 'location' keyword in text, but not in proper format")
+            # Show context around "location" keyword
+            loc_index = text.lower().find('location')
+            context_start = max(0, loc_index - 50)
+            context_end = min(len(text), loc_index + 100)
+            print(f"   Context: ...{text[context_start:context_end]}...")
+        else:
+            print(f"   ℹ️  'location' keyword not found in response at all")
+        
+        print(f"{'='*80}\n")
+        return text, None
+    
+    print(f"✅ FOUND <locations> TAGS!")
+    
+    # Extract JSON
+    locations_json = match.group(1)
+    print(f"📦 Extracted JSON (length: {len(locations_json)} chars):")
+    print(f"{locations_json[:300]}...")  # Show first 300 chars
+    
+    try:
+        # Parse JSON
+        locations = json.loads(locations_json)
+        
+        print(f"✅ Successfully parsed JSON - found {len(locations)} location(s)")
+        
+        # Log each location
+        for idx, loc in enumerate(locations, 1):
+            print(f"   {idx}. {loc.get('name', 'N/A')}, {loc.get('country', 'N/A')}")
+            print(f"      ID: {loc.get('id', 'N/A')}")
+            print(f"      Teaser: {loc.get('teaser', 'N/A')[:60]}...")
+        
+        # Remove the <locations> block from text
+        cleaned_text = re.sub(pattern, '', text).strip()
+        
+        print(f"🧹 Cleaned text (length after removal: {len(cleaned_text)} chars)")
+        print(f"{'='*80}\n")
+        
+        return cleaned_text, locations
+        
+    except json.JSONDecodeError as e:
+        print(f"❌ FAILED TO PARSE LOCATIONS JSON!")
+        print(f"   Error: {e}")
+        print(f"   JSON string: {locations_json[:200]}...")
+        print(f"{'='*80}\n")
+        # Return original text if parsing fails
+        return text, None
+
+
+@router.get("/sessions")
+async def list_brainstorm_sessions(
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    List all brainstorm sessions for current user
+
+    Returns:
+        sessions: List of conversation sessions with metadata
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Query conversations table for brainstorm module
+        result = supabase.client.table("conversations").select(
+            "conversation_id, context_summary, created_at, updated_at, messages, mode"
+        ).eq("user_id", user_id).eq("module", "brainstorm").order(
+            "updated_at", desc=True
+        ).execute()
+
+        sessions = []
+        for conv in result.data:
+            # Get last message preview
+            messages = conv.get("messages", [])
+            last_message = messages[-1] if messages else None
+
+            sessions.append({
+                "id": conv["conversation_id"],
+                "title": conv.get("context_summary") or "New Brainstorm",
+                "lastMessage": last_message.get("content", "")[:100] if last_message else "",
+                "createdAt": conv["created_at"],
+                "updatedAt": conv["updated_at"],
+                "messageCount": len(messages),
+                "isShared": conv.get("mode") == "group"
+            })
+
+        return {"sessions": sessions}
+
+    except Exception as e:
+        print(f"ERROR listing brainstorm sessions: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sessions")
+async def create_brainstorm_session(
+    title: Optional[str] = None,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    Create new brainstorm session
+    Persists to database and returns session details
+
+    Args:
+        title: Optional title for the session
+
+    Returns:
+        session_id, first_message, websocket_url
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        # Get user profile
+        user_profile = await supabase.get_user_profile(user_id)
+
+        if not user_profile:
+            # Use test profile for development
+            print(f"WARNING: No profile for user {user_id}, using test profile")
+            user_profile = UserProfile(
+                user_id=user_id,
+                preferences=UserPreferences(
+                    traveler_type="explorer",
+                    activity_level="high",
+                    environment="mixed",
+                    accommodation_style="boutique",
+                    budget_sensitivity="medium",
+                    culture_interest="high",
+                    food_importance="high"
+                ),
+                constraints=UserConstraints(
+                    dietary_restrictions=[],
+                    climate_preferences=["mild_temperate", "hot_tropical"],
+                    language_preferences=[]
+                ),
+                wishlist_regions=["Southeast Asia", "Iceland"],
+                past_destinations=["Paris", "Barcelona"]
+            )
+
+        # Generate session ID
+        session_id = f"brainstorm_{uuid.uuid4().hex[:12]}"
+
+        # Create agent with user profile
+        agent = BrainstormAgent(user_profile)
+        active_agents[session_id] = agent
+
+        # Generate personalized first message
+        first_message = agent.generate_first_message()
+
+        # Create conversation in database
+        if supabase.client:
+            conversation_data = {
+                "conversation_id": session_id,
+                "user_id": user_id,
+                "module": "brainstorm",
+                "mode": "solo",
+                "messages": [{
+                    "role": "assistant",
+                    "content": first_message,
+                    "timestamp": datetime.utcnow().isoformat()
+                }],
+                "context_summary": title or "New Travel Brainstorm",
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+
+            supabase.client.table("conversations").insert(conversation_data).execute()
+            print(f"✅ Created conversation {session_id} in database")
+
+        return {
+            "session_id": session_id,
+            "title": title or "New Travel Brainstorm",
+            "first_message": first_message,
+            "websocket_url": f"/api/brainstorm/ws/{session_id}"
+        }
+
+    except Exception as e:
+        print(f"ERROR creating brainstorm session: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sessions/{session_id}")
+async def get_brainstorm_session(
+    session_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    Get brainstorm session details and full conversation history
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Get conversation from database
+        result = supabase.client.table("conversations").select("*").eq(
+            "conversation_id", session_id
+        ).eq("user_id", user_id).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        conversation = result.data[0]
+
+        return {
+            "session_id": conversation["conversation_id"],
+            "title": conversation.get("context_summary", "Brainstorm Session"),
+            "messages": conversation.get("messages", []),
+            "createdAt": conversation["created_at"],
+            "updatedAt": conversation["updated_at"],
+            "mode": conversation.get("mode", "solo")
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR getting brainstorm session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.websocket("/ws/{session_id}")
+async def brainstorm_websocket(
+    websocket: WebSocket,
+    session_id: str
+):
+    """
+    WebSocket endpoint for real-time brainstorm conversation
+    Streams responses and persists to database
+    """
+    await websocket.accept()
+    supabase = get_supabase()
+
+    try:
+        # Load or rehydrate agent
+        if session_id not in active_agents:
+            # Try to load from database
+            if not supabase.client:
+                await websocket.close(code=1011, reason="Database not available")
+                return
+
+            result = supabase.client.table("conversations").select("*").eq(
+                "conversation_id", session_id
+            ).execute()
+
+            if not result.data:
+                await websocket.close(code=1008, reason="Session not found")
+                return
+
+            conversation = result.data[0]
+
+            # Get user profile - REQUIRED
+            user_profile = await supabase.get_user_profile(conversation["user_id"])
+            if not user_profile:
+                # No fallback - user must complete profiling first
+                print(f"❌ No profile found for user {conversation['user_id']}")
+                await websocket.close(code=1008, reason="User profile not found. Please complete profiling first.")
+                return
+
+            # Rehydrate agent with conversation history
+            agent = BrainstormAgent(user_profile)
+
+            # Restore conversation memory from messages
+            messages = conversation.get("messages", [])
+            for msg in messages:
+                if msg["role"] == "user":
+                    agent.memory.chat_memory.add_user_message(msg["content"])
+                elif msg["role"] == "assistant":
+                    agent.memory.chat_memory.add_ai_message(msg["content"])
+
+            active_agents[session_id] = agent
+            print(f"✅ Rehydrated agent for session {session_id} with {len(messages)} messages")
+
+        agent = active_agents[session_id]
+
+        while True:
+            # Receive message from user
+            data = await websocket.receive_json()
+
+            if data.get("type") == "message":
+                user_message = data.get("content")
+                print(f"DEBUG: Received message: {user_message[:50]}...")
+
+                # Send thinking indicator
+                await websocket.send_json({
+                    "type": "thinking",
+                    "session_id": session_id
+                })
+
+                # Stream response from agent with tag detection
+                print(f"\n🤖 Starting to stream agent response...")
+                full_response = ""
+                token_count = 0
+                inside_locations_tag = False
+                stream_buffer = ""  # Buffer to detect tags in real-time
+                pending_tokens = []  # Tokens waiting to be sent (in case partial tag detected)
+                
+                async for token in agent.chat(user_message):
+                    full_response += token
+                    token_count += 1
+                    stream_buffer += token
+                    pending_tokens.append(token)
+                    
+                    # Keep buffer reasonable size (last 200 chars to catch full tag)
+                    if len(stream_buffer) > 200:
+                        # Only trim if we're sure we're not in the middle of a tag
+                        if not any(partial in stream_buffer[-200:-180] for partial in ["<loc", "<loca", "<locat"]):
+                            stream_buffer = stream_buffer[-200:]
+                    
+                    # Check if we're entering <locations> tag
+                    if not inside_locations_tag and "<locations>" in stream_buffer:
+                        inside_locations_tag = True
+                        print(f"🚫 Detected <locations> tag - suppressing stream")
+                        
+                        # Find where tag starts and send only tokens before it
+                        tag_start_in_buffer = stream_buffer.find("<locations>")
+                        # Calculate how many pending tokens are before the tag
+                        chars_before_tag = tag_start_in_buffer
+                        safe_content = stream_buffer[:chars_before_tag]
+                        
+                        # Send only the safe content before the tag
+                        if safe_content:
+                            await websocket.send_json({
+                                "type": "token",
+                                "session_id": session_id,
+                                "token": safe_content
+                            })
+                        
+                        pending_tokens = []
+                        stream_buffer = ""
+                        continue
+                    
+                    # If inside locations tag, don't send tokens
+                    if inside_locations_tag:
+                        pending_tokens = []  # Clear pending
+                        # Check if we've closed the tag
+                        if "</locations>" in stream_buffer:
+                            inside_locations_tag = False
+                            # Find content after closing tag
+                            tag_end = stream_buffer.find("</locations>") + len("</locations>")
+                            stream_buffer = stream_buffer[tag_end:]
+                            print(f"✅ Detected </locations> tag - resuming stream")
+                        continue
+                    
+                    # Check if buffer might contain start of tag (be cautious)
+                    last_chars = stream_buffer[-15:] if len(stream_buffer) >= 15 else stream_buffer
+                    possible_tag_start = any(last_chars.endswith(partial) for partial in ["<", "<l", "<lo", "<loc", "<loca", "<locat", "<locati", "<locatio", "<location"])
+                    
+                    if possible_tag_start:
+                        # Hold tokens until we know if it's really a tag
+                        if len(pending_tokens) <= 15:  # Max tag length
+                            continue  # Wait for more tokens
+                    
+                    # Safe to send - no tag detected
+                    if pending_tokens:
+                        combined = "".join(pending_tokens)
+                        await websocket.send_json({
+                            "type": "token",
+                            "session_id": session_id,
+                            "token": combined
+                        })
+                        pending_tokens = []
+                    
+                    await asyncio.sleep(0.01)
+                
+                # Send any remaining pending tokens at the end
+                if pending_tokens and not inside_locations_tag:
+                    combined = "".join(pending_tokens)
+                    await websocket.send_json({
+                        "type": "token",
+                        "session_id": session_id,
+                        "token": combined
+                    })
+                    print(f"📤 Sent {len(pending_tokens)} remaining tokens at stream end")
+
+                print(f"✅ Streaming complete - received {token_count} tokens, total length: {len(full_response)} chars")
+
+                # Log full raw response for debugging
+                print(f"\n{'='*80}")
+                print(f"📜 RAW LLM RESPONSE (full text):")
+                print(f"{'='*80}")
+                print(full_response)
+                print(f"{'='*80}\n")
+
+                # Extract location proposals if present
+                print(f"\n🔎 Checking for location proposals in response...")
+                cleaned_response, locations = extract_location_proposals(full_response)
+
+                # Fetch photos for each location immediately
+                if locations:
+                    print(f"\n📸 Fetching photos for {len(locations)} locations...")
+                    from app.services.google_places_service import GooglePlacesService
+                    google_places = GooglePlacesService()
+
+                    for loc in locations:
+                        location_name = loc.get('name')
+                        try:
+                            place_info = await google_places.search_place_with_photo(location_name)
+                            if place_info and place_info.photos:
+                                photo_url = place_info.photos[0].photo_uri
+                                loc['imageUrl'] = photo_url
+                                print(f"  ✅ Photo for {location_name}: {photo_url[:80]}...")
+                            else:
+                                loc['imageUrl'] = None
+                                print(f"  ⚠️  No photo found for {location_name}")
+                        except Exception as e:
+                            print(f"  ❌ Error fetching photo for {location_name}: {e}")
+                            loc['imageUrl'] = None
+
+                # Send location proposals if found
+                if locations:
+                    print(f"\n📍 SENDING LOCATIONS TO CLIENT:")
+                    print(f"   Session: {session_id}")
+                    print(f"   Count: {len(locations)}")
+                    for idx, loc in enumerate(locations, 1):
+                        print(f"   {idx}. {loc.get('name')} ({loc.get('id')}) - Photo: {bool(loc.get('imageUrl'))}")
+
+                    await websocket.send_json({
+                        "type": "locations",
+                        "session_id": session_id,
+                        "locations": locations
+                    })
+                    print(f"✅ Location proposals sent via WebSocket with photos")
+                else:
+                    print(f"ℹ️  No location proposals to send (locations is None)")
+
+                # Send complete message (without location tags)
+                print(f"\n💬 Sending final message to client (cleaned text, length: {len(cleaned_response)} chars)")
+                await websocket.send_json({
+                    "type": "message",
+                    "session_id": session_id,
+                    "role": "assistant",
+                    "content": cleaned_response
+                })
+                print(f"✅ Complete message sent")
+
+                # Persist to database (store cleaned response without location tags)
+                if supabase.client:
+                    # Get current conversation
+                    result = supabase.client.table("conversations").select("messages").eq(
+                        "conversation_id", session_id
+                    ).execute()
+
+                    if result.data:
+                        current_messages = result.data[0].get("messages", [])
+
+                        # Append new messages (use cleaned response)
+                        current_messages.append({
+                            "role": "user",
+                            "content": user_message,
+                            "timestamp": datetime.utcnow().isoformat()
+                        })
+                        current_messages.append({
+                            "role": "assistant",
+                            "content": cleaned_response,  # Store cleaned text without <locations>
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "has_locations": locations is not None  # Flag for frontend
+                        })
+
+                        # Update conversation
+                        supabase.client.table("conversations").update({
+                            "messages": current_messages,
+                            "updated_at": datetime.utcnow().isoformat()
+                        }).eq("conversation_id", session_id).execute()
+
+                        print(f"✅ Persisted conversation to database")
+
+                print(f"DEBUG: Sent response, length: {len(full_response)}")
+
+    except WebSocketDisconnect:
+        print(f"DEBUG: WebSocket disconnected for session {session_id}")
+    except Exception as e:
+        print(f"ERROR: WebSocket error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_brainstorm_session(
+    session_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """Delete brainstorm session from database"""
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Delete from database
+        supabase.client.table("conversations").delete().eq(
+            "conversation_id", session_id
+        ).eq("user_id", user_id).execute()
+
+        # Clean up in-memory agent
+        if session_id in active_agents:
+            del active_agents[session_id]
+
+        print(f"✅ Deleted session {session_id}")
+
+        return {"message": "Session deleted successfully"}
+
+    except Exception as e:
+        print(f"ERROR deleting session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sessions/{session_id}/recommendations")
+async def create_recommendation_from_location(
+    session_id: str,
+    location_data: Dict[str, Any],
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    Create a trip recommendation from a rated location proposal
+    This converts a location proposal into a full trip plan
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Verify session exists and belongs to user
+        result = supabase.client.table("conversations").select("*").eq(
+            "conversation_id", session_id
+        ).eq("user_id", user_id).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Extract location data
+        location_id = location_data.get("id")
+        location_name = location_data.get("name")
+        country = location_data.get("country")
+        teaser = location_data.get("teaser")
+        rating = location_data.get("rating")
+
+        # Create destination info
+        destination_info = DestinationInfo(
+            name=location_name,
+            city=location_name,  # Use location name as city
+            country=country,
+            region=country,  # Can be refined later
+            description=teaser
+        )
+
+        # Create recommendation ID
+        recommendation_id = uuid.uuid4()
+
+        # Fetch logistics data FIRST, then create recommendation with all data
+        print(f"\n{'='*80}")
+        print(f"🔄 FETCHING LOGISTICS DATA for '{location_name}'")
+        print(f"{'='*80}")
+        logistics_data = {}
+        
+        try:
+            print(f"📸 1/4 Getting photo from Google Places...")
+            from app.services.google_places_service import GooglePlacesService
+            import asyncio
+            
+            # Create async function to get photo
+            async def get_photo_async():
+                service = GooglePlacesService()
+                place_info = await service.search_place_with_photo(location_name)
+                if place_info and place_info.photos:
+                    first_photo = place_info.photos[0]
+                    return first_photo.photo_uri if first_photo else None
+                return None
+            
+            # Run async function synchronously
+            photo_url = asyncio.run(get_photo_async())
+            print(f"    Raw photo_url result: {photo_url}")
+            if photo_url:
+                logistics_data['url'] = photo_url
+                print(f"  ✅ Got photo URL: {photo_url[:100]}...")
+            else:
+                logistics_data['url'] = None
+                print(f"  ⚠️ No photo URL returned")
+        except Exception as e:
+            print(f"  ❌ EXCEPTION getting photo: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            logistics_data['url'] = None
+        
+        try:
+            print(f"✈️  2/4 Getting flights & hotels from Amadeus...")
+            from app.services.amadeus_service import AmadeusService
+            
+            # Use airport service for proper city-to-airport code mapping
+            from app.services.airport_service import get_airport_service
+            airport_service = get_airport_service()
+            airport_code = airport_service.get_airport_code(location_name)
+            print(f"    Mapped '{location_name}' to airport code: {airport_code}")
+            print(f"    Calling get_trip_details_sync...")
+            trip_details = AmadeusService().get_trip_details_sync(
+                destination=airport_code
+            )
+            print(f"    Raw trip_details: {type(trip_details)}, keys: {trip_details.keys() if isinstance(trip_details, dict) else 'N/A'}")
+            logistics_data['flights'] = trip_details.get('flights', {})
+            logistics_data['hotels'] = trip_details.get('hotels', [])
+            print(f"  ✅ Got {len(logistics_data.get('hotels', []))} hotels")
+            print(f"  ✅ Flights: {bool(logistics_data.get('flights'))}")
+        except Exception as e:
+            print(f"  ❌ EXCEPTION getting flights/hotels: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            logistics_data['flights'] = {}
+            logistics_data['hotels'] = []
+        
+        try:
+            print(f"🌤️  3/4 Getting weather forecast...")
+            from app.services.weather_service import WeatherService
+            print(f"    Calling get_forecast_sync for '{location_name}', 7 days...")
+            weather_data = WeatherService().get_forecast_sync(location_name, days=7)
+            print(f"    Raw weather_data: {type(weather_data)}, keys: {weather_data.keys() if isinstance(weather_data, dict) else 'N/A'}")
+            logistics_data['weather'] = weather_data
+            print(f"  ✅ Got weather forecast")
+        except Exception as e:
+            print(f"  ❌ EXCEPTION getting weather: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            logistics_data['weather'] = {}
+        
+        try:
+            print(f"📋 4/4 Adding additional logistics metadata...")
+            # Add some basic trip planning metadata
+            logistics_data['optimal_season'] = "Year-round"  # Could be enhanced with weather analysis
+            logistics_data['estimated_budget'] = 1500  # Default budget, could be calculated from flights/hotels
+            logistics_data['currency'] = "USD"
+            logistics_data['highlights'] = [
+                f"Explore {location_name}",
+                "Local cuisine experience", 
+                "Cultural attractions",
+                "Scenic views and photography"
+            ]
+            print(f"  ✅ Added metadata: budget, season, highlights")
+        except Exception as e:
+            print(f"  ❌ EXCEPTION adding metadata: {type(e).__name__}: {e}")
+            logistics_data['optimal_season'] = "Year-round"
+            logistics_data['estimated_budget'] = 1500
+            logistics_data['currency'] = "USD"
+            logistics_data['highlights'] = []
+        
+        print(f"\n📦 LOGISTICS DATA SUMMARY:")
+        print(f"   url: {bool(logistics_data.get('url'))} ({type(logistics_data.get('url'))})")
+        print(f"   flights: {bool(logistics_data.get('flights'))} ({len(str(logistics_data.get('flights', {})))} chars)")
+        print(f"   hotels: {len(logistics_data.get('hotels', []))} items")
+        print(f"   weather: {bool(logistics_data.get('weather'))} ({len(str(logistics_data.get('weather', {})))} chars)")
+        print(f"   metadata: budget={logistics_data.get('estimated_budget')}, season={logistics_data.get('optimal_season')}")
+        
+        # Create recommendation with ALL data at once
+        print(f"\n💾 Creating recommendation with complete logistics data...")
+        print(f"   Logistics data: url={logistics_data.get('url') is not None}, flights={bool(logistics_data.get('flights'))}, hotels={len(logistics_data.get('hotels', []))}, weather={bool(logistics_data.get('weather'))}")
+        
+        # Prepare complete data for database
+        data = {
+            "recommendation_id": str(recommendation_id),
+            "user_id": user_id,
+            "destination": destination_info.model_dump(),
+            "reasoning": f"Selected from brainstorm session with {rating}/3 stars",
+            "status": "ready",  # All data is ready
+            "confidence_score": float(rating) / 3.0 if rating else None,
+            "source_conversation_id": session_id,
+            "location_proposal_id": location_id,
+            **logistics_data  # Include all logistics data
+        }
+        
+        print(f"\n🔄 Inserting complete recommendation to database...")
+        response = supabase.client.table("destination_recommendations").insert(data).execute()
+        print(f"   DB response status: {response.status_code if hasattr(response, 'status_code') else 'N/A'}")
+        print(f"   DB response data count: {len(response.data) if response.data else 0}")
+
+        print(f"\n{'='*80}")
+        print(f"✅ RECOMMENDATION READY: {recommendation_id}")
+        print(f"   Location: {location_name}, {country}")
+        print(f"   Rating: {rating}/3")
+        print(f"   Status: READY (all logistics data fetched)")
+        print(f"   Logistics: url={bool(logistics_data.get('url'))}, flights={bool(logistics_data.get('flights'))}, hotels={len(logistics_data.get('hotels', []))}, weather={bool(logistics_data.get('weather'))}")
+        print(f"   Metadata: budget=${logistics_data.get('estimated_budget')}, season={logistics_data.get('optimal_season')}, highlights={len(logistics_data.get('highlights', []))}")
+        print(f"{'='*80}\n")
+
+        # Add trip creation message to conversation history for persistence
+        try:
+            trip_message = {
+                "role": "assistant",
+                "content": f"🎉 **Trip Created!**\n\nYour trip to **{location_name}** has been created successfully! You can now start planning your adventure.",
+                "timestamp": datetime.utcnow().isoformat(),
+                "metadata": {
+                    "type": "trip_created",
+                    "tripId": str(recommendation_id),
+                    "title": f"Trip to {location_name}",
+                    "locationName": location_name,
+                    "imageUrl": location_data.get("imageUrl")
+                }
+            }
+            
+            # Fetch current conversation
+            conv_result = supabase.client.table("conversations").select("messages").eq(
+                "conversation_id", session_id
+            ).execute()
+            
+            if conv_result.data:
+                current_messages = conv_result.data[0].get("messages", [])
+                current_messages.append(trip_message)
+                
+                # Update conversation with new message
+                supabase.client.table("conversations").update({
+                    "messages": current_messages,
+                    "updated_at": datetime.utcnow().isoformat()
+                }).eq("conversation_id", session_id).execute()
+                
+                print(f"✅ Added trip creation message to conversation {session_id}")
+        except Exception as e:
+            print(f"⚠️  Failed to add trip message to conversation: {e}")
+            # Don't fail the whole request if message persistence fails
+
+        return {
+            "recommendation_id": str(recommendation_id),
+            "destination": destination_info.model_dump(),
+            "status": "ready",  # Updated to reflect final status
+            "message": f"Trip to {location_name} created! Continue planning in Trip View.",
+            "logistics_data": logistics_data  # Include logistics data in response
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR creating recommendation: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sessions/{session_id}/recommendations")
+async def get_session_recommendations(
+    session_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    Get all recommendations/trips created from this brainstorm session
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Get recommendations for this session
+        result = supabase.client.table("destination_recommendations").select("*").eq(
+            "source_conversation_id", session_id
+        ).eq("user_id", user_id).execute()
+
+        recommendations = []
+        for rec in result.data:
+            recommendations.append({
+                "id": rec["recommendation_id"],
+                "recommendation_id": rec["recommendation_id"],
+                "destination": rec["destination"],
+                "status": rec["status"],
+                "rating": rec.get("confidence_score"),
+                "createdAt": rec["created_at"],
+                "created_at": rec["created_at"],
+                "location_proposal_id": rec.get("location_proposal_id"),
+                # Logistics data
+                "url": rec.get("url"),
+                "flights": rec.get("flights", {}),
+                "hotels": rec.get("hotels", []),
+                "weather": rec.get("weather", {})
+            })
+
+        return {"recommendations": recommendations}
+
+    except Exception as e:
+        print(f"ERROR fetching session recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/recommendations/{recommendation_id}")
+async def get_recommendation_by_id(
+    recommendation_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
+    """
+    Get a specific recommendation by ID (for trip planning view)
+    """
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Get recommendation from database
+        result = supabase.client.table("destination_recommendations").select("*").eq(
+            "recommendation_id", recommendation_id
+        ).eq("user_id", user_id).execute()
+
+        if not result.data or len(result.data) == 0:
+            raise HTTPException(status_code=404, detail="Recommendation not found")
+
+        recommendation = result.data[0]
+        
+        return {
+            "recommendation_id": recommendation["recommendation_id"],
+            "destination": recommendation["destination"],
+            "status": recommendation.get("status", "suggested"),
+            "reasoning": recommendation.get("reasoning"),
+            "confidence_score": recommendation.get("confidence_score"),
+            "source_conversation_id": recommendation.get("source_conversation_id"),
+            "created_at": recommendation["created_at"],
+            "updated_at": recommendation["updated_at"],
+            # Logistics data
+            "url": recommendation.get("url"),
+            "flights": recommendation.get("flights", {}),
+            "hotels": recommendation.get("hotels", []),
+            "weather": recommendation.get("weather", {}),
+            # Trip details
+            "optimal_season": recommendation.get("optimal_season"),
+            "estimated_budget": recommendation.get("estimated_budget"),
+            "currency": recommendation.get("currency", "USD"),
+            "highlights": recommendation.get("highlights", [])
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR fetching recommendation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/session/{session_id}/recommendation/")
+async def update_recommendation(
+    session_id: str,
+    id: str, 
+    rating: int,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional),
+    **kwargs):
+    """Update recommendation for a session"""
+    print(f"🔍 VALIDATION: update_recommendation endpoint called")
+    print(f"   Session ID: {session_id}")
+    print(f"   Recommendation ID: {id}")
+    print(f"   Rating: {rating}")
+    print(f"   User ID: {current_user.user_id if current_user else TEST_USER_ID}")
+    print(f"   Additional kwargs: {kwargs}")
+    
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
+    rating_enum = Rating(rating)
+    try:
+        if not supabase.client:
+            print("❌ VALIDATION: Database not available")
+            raise HTTPException(status_code=500, detail="Database not available")
+        
+        print(f"✅ VALIDATION: Processing rating update for recommendation {id}")
+        
+        if rating_enum is Rating.ZERO_STARS:
+            # delete recommendation
+            print(f"🗑️ VALIDATION: Deleting recommendation {id} (rating = 0)")
+            supabase.client.table("destination_recommendations"
+            ).delete().eq("recommendation_id", id
+            ).eq("user_id", user_id).execute()
+            print(f"✅ VALIDATION: Recommendation {id} deleted successfully")
+            return {"message": "Recommendation deleted successfully"}
+        else:
+            print(f"📝 VALIDATION: Updating recommendation {id} with rating {rating}")
+            response = supabase.client.table("destination_recommendations").update({
+                "rating": rating_enum,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("recommendation_id", id).eq("user_id", user_id).execute()
+            print(f"✅ VALIDATION: Recommendation {id} updated successfully")
+            return DestinationRecommendation(**response.data[0])
+
+    except HTTPException:
+        print(f"❌ VALIDATION: HTTPException raised in update_recommendation")
+        raise
+    except Exception as e:
+        print(f"❌ VALIDATION: ERROR in update_recommendation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
