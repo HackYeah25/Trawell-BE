@@ -225,4 +225,5 @@ location_additional_details: |
   - Include practical details travelers need to know
   - Focus strictly on the specific answer for the json values
   - Keep the answer value in human readable format
-  - Limit your answer value to 150 words in three line break separated paragraphs
+  - Limit your answer value to very short and concise sentences
+  - Limit your answer to a maximum of 5 sentences 
