@@ -8,6 +8,9 @@ from typing import Dict, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from datetime import datetime
 
+from app.services.google_places_service import GooglePlacesService
+from app.services.amadeus_service import AmadeusService
+from app.services.weather_service import WeatherService
 from app.services.supabase_service import get_supabase
 from app.agents.planning_agent import PlanningAgent
 from app.models.user import UserProfile, UserPreferences, UserConstraints
@@ -71,7 +74,11 @@ async def apply_trip_updates(recommendation_id: str, user_id: str, updates: list
                 # Handle currency separately if present
                 if field == "estimated_budget" and "currency" in update:
                     update_data["currency"] = update["currency"]
-        
+        update_data['url'] = GooglePlacesService().get_place_photo(update_data['name'])
+        update_data['flights'] = AmadeusService().get_flights(update_data['name'])['flights']
+        update_data['hotels'] = AmadeusService().get_hotels(update_data['name'])['hotels']
+        update_data['weather'] = WeatherService().get_forecast(update_data['city'])
+
         # Update database
         result = supabase.client.table("destination_recommendations").update(
             update_data
