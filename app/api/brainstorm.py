@@ -744,15 +744,16 @@ async def get_recommendation(session_id: str):
     recommendation = agent.get_recommendation()
     return recommendation
 
-@router.post("/session/{session_id}/recommendation/{recommendation_id}")
+@router.post("/session/{session_id}/recommendation/")
 async def update_recommendation(
     session_id: str,
-    recommendation_id: str, 
-    rating: Rating):
+    id: str, 
+    rating: Rating,
+    **kwargs):
     """Update recommendation for a session"""
     if session_id not in active_agents:
         raise HTTPException(status_code=404, detail="Session not found")
 
     agent = active_agents[session_id]
-    recommendation = agent.update_recommendation(recommendation_id, rating)
+    recommendation = agent.update_recommendation(id, rating)
     return recommendation
