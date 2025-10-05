@@ -87,14 +87,14 @@ class GooglePlacesService:
     async def get_place_photo(self, photo_name: str, max_width: int = 800, max_height: int = 1600) -> Optional[PlacePhoto]:
         """
         Get photo information and URI
-        
+
         Args:
             photo_name: Name of the photo from place data
             max_width: Maximum width for the photo
             max_height: Maximum height for the photo
-            
+
         Returns:
-            PlacePhoto object or None if not found
+            PlacePhoto object with direct photo URL
         """
         try:
             params = {
@@ -102,24 +102,25 @@ class GooglePlacesService:
                 "maxWidthPx": max_width,
                 "maxHeightPx": max_height
             }
-            
-            async with httpx.AsyncClient() as client:
+
+            # Follow redirects to get the actual photo URL
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.get(
                     f"{self.base_url}/{photo_name}/media",
                     params=params,
                     timeout=30.0
                 )
-                response.raise_for_status()
-                
-                data = response.json()
-                
+
+                # The final URL after redirects IS the photo URL
+                photo_url = str(response.url)
+
                 return PlacePhoto(
                     name=photo_name,
-                    photo_uri=data.get("photoUri", ""),
-                    width_px=data.get("widthPx"),
-                    height_px=data.get("heightPx"),
+                    photo_uri=photo_url,
+                    width_px=max_width,
+                    height_px=max_height,
                 )
-                
+
         except httpx.HTTPError as e:
             print(f"HTTP error getting photo: {e}")
             return None

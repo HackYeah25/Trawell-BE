@@ -25,10 +25,12 @@ class PlanningAgent:
         self,
         recommendation: DestinationRecommendation,
         user_profile: UserProfile,
-        existing_messages: list = None
+        existing_messages: list = None,
+        logistics_data: dict = None
     ):
         self.recommendation = recommendation
         self.user_profile = user_profile
+        self.logistics_data = logistics_data or {}
         
         # Initialize LangChain LLM
         self.llm = ChatOpenAI(
@@ -54,6 +56,70 @@ class PlanningAgent:
             self._rehydrate_memory(existing_messages)
             print(f"🔄 Rehydrated memory with {len(existing_messages)} messages")
 
+    def generate_opening_message(self) -> str:
+        """
+        Generate opening message with logistics data summary
+        """
+        prompt_loader = get_prompt_loader()
+        opening_template = self.prompts.get('planning_opening_with_logistics', '')
+        
+        if not opening_template:
+            return "Hello! I'm ready to help you plan your trip. What would you like to know?"
+        
+        # Build flight summary
+        flight_summary = "No flight data available yet."
+        if self.logistics_data and self.logistics_data.get('flights'):
+            flights = self.logistics_data['flights']
+            outbound = flights.get('outbound', {})
+            return_flight = flights.get('return', {})
+            
+            if outbound:
+                outbound_price = f"{outbound.get('price', 'N/A')} {outbound.get('currency', 'EUR')}"
+                outbound_duration = outbound.get('itinerary', {}).get('totalDuration', 'N/A')
+                flight_summary = f"Outbound flight: {outbound_duration} for {outbound_price}"
+                
+                if return_flight:
+                    return_price = f"{return_flight.get('price', 'N/A')} {return_flight.get('currency', 'EUR')}"
+                    return_duration = return_flight.get('itinerary', {}).get('totalDuration', 'N/A')
+                    flight_summary += f"\nReturn flight: {return_duration} for {return_price}"
+                    total_price = float(outbound.get('price', 0)) + float(return_flight.get('price', 0))
+                    flight_summary += f"\nTotal: {total_price:.2f} {outbound.get('currency', 'EUR')}"
+        
+        # Build hotel summary
+        hotel_summary = "No hotel data available yet."
+        if self.logistics_data and self.logistics_data.get('hotels'):
+            hotels = self.logistics_data['hotels']
+            if hotels:
+                top_3 = hotels[:3]
+                hotel_lines = []
+                for hotel in top_3:
+                    name = hotel.get('name', 'Unknown')
+                    price = hotel.get('price', 'N/A')
+                    currency = hotel.get('currency', 'USD')
+                    hotel_lines.append(f"• {name}: {price} {currency}")
+                hotel_summary = "\n".join(hotel_lines)
+                if len(hotels) > 3:
+                    hotel_summary += f"\n(+{len(hotels) - 3} more options available)"
+        
+        # Build weather summary
+        weather_summary = "Weather data will be available soon."
+        if self.logistics_data and self.logistics_data.get('weather'):
+            weather = self.logistics_data['weather']
+            weather_summary = weather.get('summary', 'Weather forecast available for your travel dates.')
+        
+        # Format the opening message
+        destination = self.recommendation.destination
+        destination_name = f"{destination.city}, {destination.country}"
+        
+        opening_message = opening_template.format(
+            destination=destination_name,
+            flight_summary=flight_summary,
+            hotel_summary=hotel_summary,
+            weather_summary=weather_summary
+        )
+        
+        return opening_message
+
     def _rehydrate_memory(self, messages: list):
         """Load existing conversation into memory"""
         for msg in messages:
@@ -74,11 +140,37 @@ DESTINATION CONTEXT:
 - Description: {destination.description or 'N/A'}
 - Selected with rating: {self.recommendation.rating.value if self.recommendation.rating else 'N/A'}/3 stars
 
-Current trip details (may be incomplete - extract and update during conversation):
-- Season: {getattr(self.recommendation, 'optimal_season', 'Not specified')}
-- Budget: {getattr(self.recommendation, 'estimated_budget', 'Not specified')}
-- Highlights: {getattr(self.recommendation, 'highlights', [])}
+Current trip details (may be incomplete - will be gathered during conversation):
+- This is a newly created trip, we'll build the plan together
 """
+
+        # Add logistics data context
+        logistics_context = ""
+        if self.logistics_data:
+            flights = self.logistics_data.get('flights', {})
+            hotels = self.logistics_data.get('hotels', [])
+            weather = self.logistics_data.get('weather', {})
+            
+            logistics_context = "\nLOGISTICS DATA AVAILABLE:\n"
+            
+            if flights and flights.get('outbound'):
+                outbound = flights['outbound']
+                return_flight = flights.get('return', {})
+                logistics_context += f"""
+FLIGHTS:
+- Outbound: {outbound.get('itinerary', {}).get('totalDuration', 'N/A')} for {outbound.get('price', 'N/A')} {outbound.get('currency', 'EUR')}
+  Route: {' → '.join([seg.get('from', '') for seg in outbound.get('itinerary', {}).get('segments', [])] + [outbound.get('itinerary', {}).get('segments', [{}])[-1].get('to', '') if outbound.get('itinerary', {}).get('segments') else ''])}
+"""
+                if return_flight:
+                    logistics_context += f"- Return: {return_flight.get('itinerary', {}).get('totalDuration', 'N/A')} for {return_flight.get('price', 'N/A')} {return_flight.get('currency', 'EUR')}\n"
+            
+            if hotels:
+                logistics_context += f"\nHOTELS ({len(hotels)} options found):\n"
+                for i, hotel in enumerate(hotels[:3], 1):
+                    logistics_context += f"- {hotel.get('name', 'N/A')}: {hotel.get('price', 'N/A')} {hotel.get('currency', 'USD')}\n"
+            
+            if weather:
+                logistics_context += f"\nWEATHER FORECAST:\n- {weather.get('summary', 'Weather data available')}\n"
 
         # Add user profile context
         prefs = self.user_profile.preferences
@@ -110,6 +202,7 @@ CONSTRAINTS:
         system_prompt = f"""{base_prompt}
 
 {dest_context}
+{logistics_context}
 
 {profile_context}
 
@@ -174,6 +267,23 @@ When you've gathered enough information in a category, use structured tags:
   "value": ["Shibuya Crossing", "Senso-ji Temple", "Tsukiji Market"]
 }}
 </trip_update>
+
+**IMPORTANT - Visual Enhancement:**
+
+When mentioning specific attractions, landmarks, or places, include a photo tag so the user can see it:
+
+<photo>{{
+  "query": "Uluwatu Temple Bali",
+  "caption": "Uluwatu Temple - Perched on a cliff with breathtaking sunset views"
+}}</photo>
+
+Use photo tags for:
+- Temples, monuments, landmarks
+- Beaches, waterfalls, natural attractions
+- Famous viewpoints and scenic spots
+- Cultural sites and museums
+
+Keep captions short and descriptive. The system will automatically fetch and display the photos inline.
 
 Be conversational and helpful - extract information naturally through dialogue!
 """

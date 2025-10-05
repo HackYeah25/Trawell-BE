@@ -22,11 +22,21 @@ class TripResponse(BaseModel):
     title: str
     destination: Optional[str] = None
     locationName: Optional[str] = None
-    imageUrl: Optional[str] = None
+    imageUrl: Optional[str] = None  # Deprecated - use url instead
+    url: Optional[str] = None  # Google Places photo URL
     createdAt: str
     updatedAt: Optional[str] = None
     status: Optional[str] = None
     rating: Optional[float] = None
+    # Logistics data
+    flights: Optional[dict] = None
+    hotels: Optional[list] = None
+    weather: Optional[dict] = None
+    # Trip details
+    optimal_season: Optional[str] = None
+    estimated_budget: Optional[float] = None
+    currency: Optional[str] = None
+    highlights: Optional[list] = None
 
 
 @router.get("", response_model=List[TripResponse])
@@ -60,25 +70,36 @@ async def list_trips(
             # Handle both dict and potential string formats
             if isinstance(destination_data, str):
                 destination_name = destination_data
-                image_url = None
             else:
                 destination_name = (
                     destination_data.get("name") or 
                     destination_data.get("city") or 
                     "Unknown Destination"
                 )
-                image_url = destination_data.get("imageUrl")
+            
+            # Use top-level url field (from Google Places API)
+            photo_url = rec.get("url")
             
             trips.append(TripResponse(
                 id=rec["recommendation_id"],
                 title=destination_name,
                 destination=destination_name,
                 locationName=destination_name,
-                imageUrl=image_url,
+                imageUrl=photo_url,  # Legacy field for backwards compatibility
+                url=photo_url,  # New field
                 createdAt=rec["created_at"],
                 updatedAt=rec.get("updated_at"),
                 status=rec.get("status", "suggested"),
-                rating=None
+                rating=None,
+                # Logistics data
+                flights=rec.get("flights", {}),
+                hotels=rec.get("hotels", []),
+                weather=rec.get("weather", {}),
+                # Trip details
+                optimal_season=rec.get("optimal_season"),
+                estimated_budget=rec.get("estimated_budget"),
+                currency=rec.get("currency"),
+                highlights=rec.get("highlights", [])
             ))
         
         # Fetch trip plans
@@ -92,25 +113,35 @@ async def list_trips(
             
             if isinstance(destination_data, str):
                 destination_name = destination_data
-                image_url = None
             else:
                 destination_name = (
                     destination_data.get("name") or 
                     destination_data.get("city") or 
                     "Unknown Destination"
                 )
-                image_url = destination_data.get("imageUrl")
+            
+            # Trip plans don't have url field (yet), so no photo
+            photo_url = None
             
             trips.append(TripResponse(
                 id=plan["trip_id"],
                 title=destination_name,
                 destination=destination_name,
                 locationName=destination_name,
-                imageUrl=image_url,
+                imageUrl=photo_url,
+                url=photo_url,
                 createdAt=plan["created_at"],
                 updatedAt=plan.get("updated_at"),
                 status=plan.get("status", "draft"),
-                rating=None
+                rating=None,
+                # Trip plans don't have logistics data (yet)
+                flights=None,
+                hotels=None,
+                weather=None,
+                optimal_season=None,
+                estimated_budget=plan.get("estimated_budget"),
+                currency=None,
+                highlights=None
             ))
         
         # Sort by created_at descending
@@ -152,25 +183,36 @@ async def get_trip(
             
             if isinstance(destination_data, str):
                 destination_name = destination_data
-                image_url = None
             else:
                 destination_name = (
                     destination_data.get("name") or 
                     destination_data.get("city") or 
                     "Unknown Destination"
                 )
-                image_url = destination_data.get("imageUrl")
+            
+            # Use top-level url field (from Google Places API)
+            photo_url = rec.get("url")
             
             return TripResponse(
                 id=rec["recommendation_id"],
                 title=destination_name,
                 destination=destination_name,
                 locationName=destination_name,
-                imageUrl=image_url,
+                imageUrl=photo_url,  # Legacy field for backwards compatibility
+                url=photo_url,  # New field
                 createdAt=rec["created_at"],
                 updatedAt=rec.get("updated_at"),
                 status=rec.get("status", "suggested"),
-                rating=None
+                rating=None,
+                # Logistics data
+                flights=rec.get("flights", {}),
+                hotels=rec.get("hotels", []),
+                weather=rec.get("weather", {}),
+                # Trip details
+                optimal_season=rec.get("optimal_season"),
+                estimated_budget=rec.get("estimated_budget"),
+                currency=rec.get("currency"),
+                highlights=rec.get("highlights", [])
             )
         
         # Try trip_plans
@@ -184,25 +226,35 @@ async def get_trip(
             
             if isinstance(destination_data, str):
                 destination_name = destination_data
-                image_url = None
             else:
                 destination_name = (
                     destination_data.get("name") or 
                     destination_data.get("city") or 
                     "Unknown Destination"
                 )
-                image_url = destination_data.get("imageUrl")
+            
+            # Trip plans don't have url field (yet), so no photo
+            photo_url = None
             
             return TripResponse(
                 id=plan["trip_id"],
                 title=destination_name,
                 destination=destination_name,
                 locationName=destination_name,
-                imageUrl=image_url,
+                imageUrl=photo_url,
+                url=photo_url,
                 createdAt=plan["created_at"],
                 updatedAt=plan.get("updated_at"),
                 status=plan.get("status", "draft"),
-                rating=None
+                rating=None,
+                # Trip plans don't have logistics data (yet)
+                flights=None,
+                hotels=None,
+                weather=None,
+                optimal_season=None,
+                estimated_budget=plan.get("estimated_budget"),
+                currency=None,
+                highlights=None
             )
         
         raise HTTPException(status_code=404, detail="Trip not found")

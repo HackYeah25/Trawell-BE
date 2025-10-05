@@ -34,7 +34,7 @@ def extract_trip_updates(text: str) -> list:
     """
     pattern = r'<trip_update>\s*(\{[^}]+\})\s*</trip_update>'
     matches = re.findall(pattern, text, re.DOTALL)
-    
+
     updates = []
     for match in matches:
         try:
@@ -44,8 +44,63 @@ def extract_trip_updates(text: str) -> list:
         except json.JSONDecodeError as e:
             print(f"❌ Failed to parse trip update JSON: {e}")
             continue
-    
+
     return updates
+
+
+def extract_photo_tags(text: str) -> list:
+    """
+    Extract <photo> tags from LLM response for inline photos
+    Returns list of {query, caption} dicts
+    """
+    pattern = r'<photo>\s*(\{[^}]+\})\s*</photo>'
+    matches = re.findall(pattern, text, re.DOTALL)
+
+    photos = []
+    for match in matches:
+        try:
+            data = json.loads(match)
+            photos.append(data)
+            print(f"📸 Extracted photo tag: {data.get('query')}")
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse photo JSON: {e}")
+            continue
+
+    return photos
+
+
+async def fetch_photos_for_tags(photo_tags: list) -> list:
+    """
+    Fetch actual photo URLs for photo tags
+    Returns list of {query, caption, url} dicts
+    """
+    if not photo_tags:
+        return []
+
+    from app.services.google_places_service import GooglePlacesService
+    google_places = GooglePlacesService()
+
+    photos_with_urls = []
+    for tag in photo_tags:
+        query = tag.get('query')
+        caption = tag.get('caption', '')
+
+        try:
+            place_info = await google_places.search_place_with_photo(query)
+            if place_info and place_info.photos:
+                photo_url = place_info.photos[0].photo_uri
+                photos_with_urls.append({
+                    'query': query,
+                    'caption': caption,
+                    'url': photo_url
+                })
+                print(f"  ✅ Photo URL for '{query}': {photo_url[:80]}...")
+            else:
+                print(f"  ⚠️  No photo found for '{query}'")
+        except Exception as e:
+            print(f"  ❌ Error fetching photo for '{query}': {e}")
+
+    return photos_with_urls
 
 
 async def apply_trip_updates(recommendation_id: str, user_id: str, updates: list):
@@ -74,10 +129,11 @@ async def apply_trip_updates(recommendation_id: str, user_id: str, updates: list
                 # Handle currency separately if present
                 if field == "estimated_budget" and "currency" in update:
                     update_data["currency"] = update["currency"]
-        update_data['url'] = GooglePlacesService().get_place_photo(update_data['name'])
-        update_data['flights'] = AmadeusService().get_flights(update_data['name'])['flights']
-        update_data['hotels'] = AmadeusService().get_hotels(update_data['name'])['hotels']
-        update_data['weather'] = WeatherService().get_forecast(update_data['city'])
+        # Note: Logistics data should already be in database from brainstorm phase
+        # We only update specific fields that user changes, not re-fetch everything
+        print(f"📝 PLANNING: Applying trip updates - no re-fetching logistics data")
+        update_summary = [f"{u.get('field')}={u.get('value')}" for u in updates]
+        print(f"   Updates: {update_summary}")
 
         # Update database
         result = supabase.client.table("destination_recommendations").update(
@@ -155,16 +211,43 @@ async def planning_websocket(
         recommendation = DestinationRecommendation(
             recommendation_id=rec_data["recommendation_id"],
             user_id=rec_data["user_id"],
-            destination=destination
+            destination=destination,
+            rating=rec_data.get("rating"),
+            details=rec_data.get("details")
         )
         
-        # Add optional fields if present
-        if rec_data.get("optimal_season"):
-            recommendation.optimal_season = rec_data["optimal_season"]
-        if rec_data.get("estimated_budget"):
-            recommendation.estimated_budget = rec_data["estimated_budget"]
-        if rec_data.get("highlights"):
-            recommendation.highlights = rec_data["highlights"]
+        # Extract logistics data
+        logistics_data = {
+            "url": rec_data.get("url"),
+            "flights": rec_data.get("flights", {}),
+            "hotels": rec_data.get("hotels", []),
+            "weather": rec_data.get("weather", {})
+        }
+        
+        print(f"📊 PLANNING WEBSOCKET: Loaded logistics data from DB:")
+        print(f"   url: {bool(logistics_data.get('url'))} ({logistics_data.get('url')})")
+        print(f"   flights: {bool(logistics_data.get('flights'))} ({len(str(logistics_data.get('flights', {})))} chars)")
+        print(f"   hotels: {len(logistics_data.get('hotels', []))} items")
+        print(f"   weather: {bool(logistics_data.get('weather'))} ({len(str(logistics_data.get('weather', {})))} chars)")
+        print(f"   destination: {rec_data.get('destination', {}).get('name', 'N/A')}")
+        print(f"   status: {rec_data.get('status', 'N/A')}")
+        
+        # Check if logistics data is missing and needs to be fetched
+        missing_data = []
+        if not logistics_data.get('url'):
+            missing_data.append('photos')
+        if not logistics_data.get('flights'):
+            missing_data.append('flights')
+        if not logistics_data.get('hotels'):
+            missing_data.append('hotels')
+        if not logistics_data.get('weather'):
+            missing_data.append('weather')
+            
+        if missing_data:
+            print(f"⚠️ PLANNING WEBSOCKET: Missing logistics data: {missing_data}")
+            print(f"   This should have been fetched during brainstorm phase!")
+        else:
+            print(f"✅ PLANNING WEBSOCKET: All logistics data present - no need to re-fetch")
         
         # TODO: Fetch existing planning messages from database (when we have trip_conversations table)
         existing_messages = []
@@ -174,10 +257,32 @@ async def planning_websocket(
             agent = PlanningAgent(
                 recommendation=recommendation,
                 user_profile=user_profile,
-                existing_messages=existing_messages
+                existing_messages=existing_messages,
+                logistics_data=logistics_data
             )
             active_planning_agents[recommendation_id] = agent
             print(f"✅ Created new planning agent for {recommendation_id}")
+            
+            # Send initial logistics cards to frontend (for UI display)
+            await websocket.send_json({
+                "type": "logistics_data",
+                "recommendation_id": recommendation_id,
+                "data": logistics_data
+            })
+            
+            # Generate and send opening message with logistics context
+            opening_message = agent.generate_opening_message()
+            
+            # Add opening message to agent's memory to maintain context
+            agent.memory.chat_memory.add_ai_message(opening_message)
+            
+            await websocket.send_json({
+                "type": "message",
+                "recommendation_id": recommendation_id,
+                "role": "assistant",
+                "content": opening_message
+            })
+            print(f"📨 Sent opening message with logistics context")
         else:
             agent = active_planning_agents[recommendation_id]
             print(f"🔄 Reusing existing planning agent for {recommendation_id}")
@@ -202,57 +307,81 @@ async def planning_websocket(
                 full_response = ""
                 token_count = 0
                 
-                # Real-time tag filtering (hide <trip_update> tags from stream)
+                # Real-time tag filtering (hide <trip_update> and <photo> tags from stream)
                 stream_buffer = ""
                 pending_tokens = []
-                inside_update_tag = False
-                
+                inside_tag = False
+                current_tag = None
+
                 async for token in agent.chat(user_message):
                     full_response += token
                     token_count += 1
                     stream_buffer += token
                     pending_tokens.append(token)
-                    
+
                     # Keep buffer reasonable size
                     if len(stream_buffer) > 200:
-                        if not any(partial in stream_buffer[-200:-180] for partial in ["<tri", "<trip"]):
+                        if not any(partial in stream_buffer[-200:-180] for partial in ["<tri", "<trip", "<pho", "<phot"]):
                             stream_buffer = stream_buffer[-200:]
-                    
-                    # Check if we're entering <trip_update> tag
-                    if not inside_update_tag and "<trip_update>" in stream_buffer:
-                        inside_update_tag = True
-                        print(f"🚫 Detected <trip_update> tag - suppressing stream")
-                        
-                        # Send only content before tag
-                        tag_start = stream_buffer.find("<trip_update>")
-                        safe_content = stream_buffer[:tag_start]
-                        
-                        if safe_content:
-                            await websocket.send_json({
-                                "type": "token",
-                                "recommendation_id": recommendation_id,
-                                "token": safe_content
-                            })
-                        
-                        pending_tokens = []
-                        stream_buffer = ""
-                        continue
-                    
-                    # If inside update tag, don't send tokens
-                    if inside_update_tag:
+
+                    # Check if we're entering a tag
+                    if not inside_tag:
+                        if "<trip_update>" in stream_buffer:
+                            inside_tag = True
+                            current_tag = "trip_update"
+                            print(f"🚫 Detected <trip_update> tag - suppressing stream")
+
+                            tag_start = stream_buffer.find("<trip_update>")
+                            safe_content = stream_buffer[:tag_start]
+
+                            if safe_content:
+                                await websocket.send_json({
+                                    "type": "token",
+                                    "recommendation_id": recommendation_id,
+                                    "token": safe_content
+                                })
+
+                            pending_tokens = []
+                            stream_buffer = ""
+                            continue
+                        elif "<photo>" in stream_buffer:
+                            inside_tag = True
+                            current_tag = "photo"
+                            print(f"📸 Detected <photo> tag - suppressing stream")
+
+                            tag_start = stream_buffer.find("<photo>")
+                            safe_content = stream_buffer[:tag_start]
+
+                            if safe_content:
+                                await websocket.send_json({
+                                    "type": "token",
+                                    "recommendation_id": recommendation_id,
+                                    "token": safe_content
+                                })
+
+                            pending_tokens = []
+                            stream_buffer = ""
+                            continue
+
+                    # If inside tag, don't send tokens
+                    if inside_tag:
                         pending_tokens = []
                         # Check if we've closed the tag
-                        if "</trip_update>" in stream_buffer:
-                            inside_update_tag = False
-                            tag_end = stream_buffer.find("</trip_update>") + len("</trip_update>")
+                        close_tag = f"</{current_tag}>"
+                        if close_tag in stream_buffer:
+                            inside_tag = False
+                            tag_end = stream_buffer.find(close_tag) + len(close_tag)
                             stream_buffer = stream_buffer[tag_end:]
-                            print(f"✅ Detected </trip_update> tag - resuming stream")
+                            print(f"✅ Detected {close_tag} tag - resuming stream")
+                            current_tag = None
                         continue
-                    
+
                     # Check if buffer might contain start of tag
                     last_chars = stream_buffer[-15:] if len(stream_buffer) >= 15 else stream_buffer
-                    possible_tag_start = any(last_chars.endswith(partial) for partial in ["<", "<t", "<tr", "<tri", "<trip", "<trip_", "<trip_u", "<trip_up"])
-                    
+                    possible_tag_start = any(last_chars.endswith(partial) for partial in
+                        ["<", "<t", "<tr", "<tri", "<trip", "<trip_", "<trip_u", "<trip_up",
+                         "<p", "<ph", "<pho", "<phot", "<photo"])
+
                     if possible_tag_start:
                         if len(pending_tokens) <= 15:
                             continue
@@ -270,7 +399,7 @@ async def planning_websocket(
                     await asyncio.sleep(0.01)
                 
                 # Send any remaining pending tokens
-                if pending_tokens and not inside_update_tag:
+                if pending_tokens and not inside_tag:
                     combined = "".join(pending_tokens)
                     await websocket.send_json({
                         "type": "token",
@@ -282,25 +411,42 @@ async def planning_websocket(
                 updates = extract_trip_updates(full_response)
                 if updates:
                     await apply_trip_updates(recommendation_id, user_id, updates)
-                    
+
                     # Notify client about updates
                     await websocket.send_json({
                         "type": "trip_updated",
                         "recommendation_id": recommendation_id,
                         "updates": updates
                     })
-                
-                # Clean response (remove update tags)
-                cleaned_response = re.sub(r'<trip_update>.*?</trip_update>', '', full_response, flags=re.DOTALL).strip()
-                
+
+                # Extract and fetch photos for inline display
+                photo_tags = extract_photo_tags(full_response)
+                photos_with_urls = []
+                if photo_tags:
+                    print(f"📸 Found {len(photo_tags)} photo tags, fetching URLs...")
+                    photos_with_urls = await fetch_photos_for_tags(photo_tags)
+
+                    # Send photos to client for inline display
+                    if photos_with_urls:
+                        await websocket.send_json({
+                            "type": "photos",
+                            "recommendation_id": recommendation_id,
+                            "photos": photos_with_urls
+                        })
+                        print(f"✅ Sent {len(photos_with_urls)} photos to client")
+
+                # Clean response (remove update and photo tags)
+                cleaned_response = re.sub(r'<trip_update>.*?</trip_update>', '', full_response, flags=re.DOTALL)
+                cleaned_response = re.sub(r'<photo>.*?</photo>', '', cleaned_response, flags=re.DOTALL).strip()
+
                 # Send complete message
                 await websocket.send_json({
                     "type": "complete",
                     "recommendation_id": recommendation_id,
                     "content": cleaned_response
                 })
-                
-                print(f"✅ Planning response complete ({token_count} tokens, {len(updates)} updates)")
+
+                print(f"✅ Planning response complete ({token_count} tokens, {len(updates)} updates, {len(photos_with_urls)} photos)")
                 
                 # TODO: Persist conversation to trip_conversations table
             
@@ -359,7 +505,13 @@ async def get_trip_summary(
             } if rec.get("estimated_budget") else None,
             "highlights": rec.get("highlights", []),
             "status": rec.get("status"),
-            "completeness": calculate_completeness(rec)
+            "completeness": calculate_completeness(rec),
+            "logistics": {
+                "url": rec.get("url"),
+                "flights": rec.get("flights", {}),
+                "hotels": rec.get("hotels", []),
+                "weather": rec.get("weather", {})
+            }
         }
         
         return summary

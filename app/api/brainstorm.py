@@ -467,20 +467,41 @@ async def brainstorm_websocket(
                 print(f"\n🔎 Checking for location proposals in response...")
                 cleaned_response, locations = extract_location_proposals(full_response)
 
+                # Fetch photos for each location immediately
+                if locations:
+                    print(f"\n📸 Fetching photos for {len(locations)} locations...")
+                    from app.services.google_places_service import GooglePlacesService
+                    google_places = GooglePlacesService()
+
+                    for loc in locations:
+                        location_name = loc.get('name')
+                        try:
+                            place_info = await google_places.search_place_with_photo(location_name)
+                            if place_info and place_info.photos:
+                                photo_url = place_info.photos[0].photo_uri
+                                loc['imageUrl'] = photo_url
+                                print(f"  ✅ Photo for {location_name}: {photo_url[:80]}...")
+                            else:
+                                loc['imageUrl'] = None
+                                print(f"  ⚠️  No photo found for {location_name}")
+                        except Exception as e:
+                            print(f"  ❌ Error fetching photo for {location_name}: {e}")
+                            loc['imageUrl'] = None
+
                 # Send location proposals if found
                 if locations:
                     print(f"\n📍 SENDING LOCATIONS TO CLIENT:")
                     print(f"   Session: {session_id}")
                     print(f"   Count: {len(locations)}")
                     for idx, loc in enumerate(locations, 1):
-                        print(f"   {idx}. {loc.get('name')} ({loc.get('id')})")
-                    
+                        print(f"   {idx}. {loc.get('name')} ({loc.get('id')}) - Photo: {bool(loc.get('imageUrl'))}")
+
                     await websocket.send_json({
                         "type": "locations",
                         "session_id": session_id,
                         "locations": locations
                     })
-                    print(f"✅ Location proposals sent via WebSocket")
+                    print(f"✅ Location proposals sent via WebSocket with photos")
                 else:
                     print(f"ℹ️  No location proposals to send (locations is None)")
 
@@ -609,23 +630,137 @@ async def create_recommendation_from_location(
         # Create recommendation ID
         recommendation_id = uuid.uuid4()
 
-        # Prepare data for database (bypassing Pydantic model to match DB schema)
+        # Fetch logistics data FIRST, then create recommendation with all data
+        print(f"\n{'='*80}")
+        print(f"🔄 FETCHING LOGISTICS DATA for '{location_name}'")
+        print(f"{'='*80}")
+        logistics_data = {}
+        
+        try:
+            print(f"📸 1/4 Getting photo from Google Places...")
+            from app.services.google_places_service import GooglePlacesService
+            import asyncio
+            
+            # Create async function to get photo
+            async def get_photo_async():
+                service = GooglePlacesService()
+                place_info = await service.search_place_with_photo(location_name)
+                if place_info and place_info.photos:
+                    first_photo = place_info.photos[0]
+                    return first_photo.photo_uri if first_photo else None
+                return None
+            
+            # Run async function synchronously
+            photo_url = asyncio.run(get_photo_async())
+            print(f"    Raw photo_url result: {photo_url}")
+            if photo_url:
+                logistics_data['url'] = photo_url
+                print(f"  ✅ Got photo URL: {photo_url[:100]}...")
+            else:
+                logistics_data['url'] = None
+                print(f"  ⚠️ No photo URL returned")
+        except Exception as e:
+            print(f"  ❌ EXCEPTION getting photo: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            logistics_data['url'] = None
+        
+        try:
+            print(f"✈️  2/4 Getting flights & hotels from Amadeus...")
+            from app.services.amadeus_service import AmadeusService
+            
+            # Use airport service for proper city-to-airport code mapping
+            from app.services.airport_service import get_airport_service
+            airport_service = get_airport_service()
+            airport_code = airport_service.get_airport_code(location_name)
+            print(f"    Mapped '{location_name}' to airport code: {airport_code}")
+            print(f"    Calling get_trip_details_sync...")
+            trip_details = AmadeusService().get_trip_details_sync(
+                destination=airport_code
+            )
+            print(f"    Raw trip_details: {type(trip_details)}, keys: {trip_details.keys() if isinstance(trip_details, dict) else 'N/A'}")
+            logistics_data['flights'] = trip_details.get('flights', {})
+            logistics_data['hotels'] = trip_details.get('hotels', [])
+            print(f"  ✅ Got {len(logistics_data.get('hotels', []))} hotels")
+            print(f"  ✅ Flights: {bool(logistics_data.get('flights'))}")
+        except Exception as e:
+            print(f"  ❌ EXCEPTION getting flights/hotels: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            logistics_data['flights'] = {}
+            logistics_data['hotels'] = []
+        
+        try:
+            print(f"🌤️  3/4 Getting weather forecast...")
+            from app.services.weather_service import WeatherService
+            print(f"    Calling get_forecast_sync for '{location_name}', 7 days...")
+            weather_data = WeatherService().get_forecast_sync(location_name, days=7)
+            print(f"    Raw weather_data: {type(weather_data)}, keys: {weather_data.keys() if isinstance(weather_data, dict) else 'N/A'}")
+            logistics_data['weather'] = weather_data
+            print(f"  ✅ Got weather forecast")
+        except Exception as e:
+            print(f"  ❌ EXCEPTION getting weather: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            logistics_data['weather'] = {}
+        
+        try:
+            print(f"📋 4/4 Adding additional logistics metadata...")
+            # Add some basic trip planning metadata
+            logistics_data['optimal_season'] = "Year-round"  # Could be enhanced with weather analysis
+            logistics_data['estimated_budget'] = 1500  # Default budget, could be calculated from flights/hotels
+            logistics_data['currency'] = "USD"
+            logistics_data['highlights'] = [
+                f"Explore {location_name}",
+                "Local cuisine experience", 
+                "Cultural attractions",
+                "Scenic views and photography"
+            ]
+            print(f"  ✅ Added metadata: budget, season, highlights")
+        except Exception as e:
+            print(f"  ❌ EXCEPTION adding metadata: {type(e).__name__}: {e}")
+            logistics_data['optimal_season'] = "Year-round"
+            logistics_data['estimated_budget'] = 1500
+            logistics_data['currency'] = "USD"
+            logistics_data['highlights'] = []
+        
+        print(f"\n📦 LOGISTICS DATA SUMMARY:")
+        print(f"   url: {bool(logistics_data.get('url'))} ({type(logistics_data.get('url'))})")
+        print(f"   flights: {bool(logistics_data.get('flights'))} ({len(str(logistics_data.get('flights', {})))} chars)")
+        print(f"   hotels: {len(logistics_data.get('hotels', []))} items")
+        print(f"   weather: {bool(logistics_data.get('weather'))} ({len(str(logistics_data.get('weather', {})))} chars)")
+        print(f"   metadata: budget={logistics_data.get('estimated_budget')}, season={logistics_data.get('optimal_season')}")
+        
+        # Create recommendation with ALL data at once
+        print(f"\n💾 Creating recommendation with complete logistics data...")
+        print(f"   Logistics data: url={logistics_data.get('url') is not None}, flights={bool(logistics_data.get('flights'))}, hotels={len(logistics_data.get('hotels', []))}, weather={bool(logistics_data.get('weather'))}")
+        
+        # Prepare complete data for database
         data = {
             "recommendation_id": str(recommendation_id),
             "user_id": user_id,
             "destination": destination_info.model_dump(),
             "reasoning": f"Selected from brainstorm session with {rating}/3 stars",
-            "status": "selected",
+            "status": "ready",  # All data is ready
             "confidence_score": float(rating) / 3.0 if rating else None,
             "source_conversation_id": session_id,
             "location_proposal_id": location_id,
+            **logistics_data  # Include all logistics data
         }
         
+        print(f"\n🔄 Inserting complete recommendation to database...")
         response = supabase.client.table("destination_recommendations").insert(data).execute()
+        print(f"   DB response status: {response.status_code if hasattr(response, 'status_code') else 'N/A'}")
+        print(f"   DB response data count: {len(response.data) if response.data else 0}")
 
-        print(f"✅ Created recommendation {recommendation_id} from session {session_id}")
+        print(f"\n{'='*80}")
+        print(f"✅ RECOMMENDATION READY: {recommendation_id}")
         print(f"   Location: {location_name}, {country}")
         print(f"   Rating: {rating}/3")
+        print(f"   Status: READY (all logistics data fetched)")
+        print(f"   Logistics: url={bool(logistics_data.get('url'))}, flights={bool(logistics_data.get('flights'))}, hotels={len(logistics_data.get('hotels', []))}, weather={bool(logistics_data.get('weather'))}")
+        print(f"   Metadata: budget=${logistics_data.get('estimated_budget')}, season={logistics_data.get('optimal_season')}, highlights={len(logistics_data.get('highlights', []))}")
+        print(f"{'='*80}\n")
 
         # Add trip creation message to conversation history for persistence
         try:
@@ -665,8 +800,9 @@ async def create_recommendation_from_location(
         return {
             "recommendation_id": str(recommendation_id),
             "destination": destination_info.model_dump(),
-            "status": "selected",
-            "message": f"Trip to {location_name} created! Continue planning in Trip View."
+            "status": "ready",  # Updated to reflect final status
+            "message": f"Trip to {location_name} created! Continue planning in Trip View.",
+            "logistics_data": logistics_data  # Include logistics data in response
         }
 
     except HTTPException:
@@ -702,11 +838,18 @@ async def get_session_recommendations(
         for rec in result.data:
             recommendations.append({
                 "id": rec["recommendation_id"],
+                "recommendation_id": rec["recommendation_id"],
                 "destination": rec["destination"],
                 "status": rec["status"],
                 "rating": rec.get("confidence_score"),
                 "createdAt": rec["created_at"],
-                "location_proposal_id": rec.get("location_proposal_id")
+                "created_at": rec["created_at"],
+                "location_proposal_id": rec.get("location_proposal_id"),
+                # Logistics data
+                "url": rec.get("url"),
+                "flights": rec.get("flights", {}),
+                "hotels": rec.get("hotels", []),
+                "weather": rec.get("weather", {})
             })
 
         return {"recommendations": recommendations}
@@ -749,7 +892,17 @@ async def get_recommendation_by_id(
             "confidence_score": recommendation.get("confidence_score"),
             "source_conversation_id": recommendation.get("source_conversation_id"),
             "created_at": recommendation["created_at"],
-            "updated_at": recommendation["updated_at"]
+            "updated_at": recommendation["updated_at"],
+            # Logistics data
+            "url": recommendation.get("url"),
+            "flights": recommendation.get("flights", {}),
+            "hotels": recommendation.get("hotels", []),
+            "weather": recommendation.get("weather", {}),
+            # Trip details
+            "optimal_season": recommendation.get("optimal_season"),
+            "estimated_budget": recommendation.get("estimated_budget"),
+            "currency": recommendation.get("currency", "USD"),
+            "highlights": recommendation.get("highlights", [])
         }
 
     except HTTPException:
@@ -760,32 +913,49 @@ async def get_recommendation_by_id(
 
 @router.post("/session/{session_id}/recommendation/")
 async def update_recommendation(
+    session_id: str,
     id: str, 
     rating: int,
     current_user: Optional[TokenData] = Depends(get_current_user_optional),
     **kwargs):
     """Update recommendation for a session"""
+    print(f"🔍 VALIDATION: update_recommendation endpoint called")
+    print(f"   Session ID: {session_id}")
+    print(f"   Recommendation ID: {id}")
+    print(f"   Rating: {rating}")
+    print(f"   User ID: {current_user.user_id if current_user else TEST_USER_ID}")
+    print(f"   Additional kwargs: {kwargs}")
+    
     user_id = current_user.user_id if current_user else TEST_USER_ID
     supabase = get_supabase()
     rating_enum = Rating(rating)
     try:
         if not supabase.client:
+            print("❌ VALIDATION: Database not available")
             raise HTTPException(status_code=500, detail="Database not available")
+        
+        print(f"✅ VALIDATION: Processing rating update for recommendation {id}")
+        
         if rating_enum is Rating.ZERO_STARS:
             # delete recommendation
+            print(f"🗑️ VALIDATION: Deleting recommendation {id} (rating = 0)")
             supabase.client.table("destination_recommendations"
             ).delete().eq("recommendation_id", id
             ).eq("user_id", user_id).execute()
+            print(f"✅ VALIDATION: Recommendation {id} deleted successfully")
             return {"message": "Recommendation deleted successfully"}
         else:
+            print(f"📝 VALIDATION: Updating recommendation {id} with rating {rating}")
             response = supabase.client.table("destination_recommendations").update({
                 "rating": rating_enum,
                 "updated_at": datetime.utcnow().isoformat()
             }).eq("recommendation_id", id).eq("user_id", user_id).execute()
+            print(f"✅ VALIDATION: Recommendation {id} updated successfully")
             return DestinationRecommendation(**response.data[0])
 
     except HTTPException:
+        print(f"❌ VALIDATION: HTTPException raised in update_recommendation")
         raise
     except Exception as e:
-        print(f"ERROR fetching recommendation: {e}")
+        print(f"❌ VALIDATION: ERROR in update_recommendation: {e}")
         raise HTTPException(status_code=500, detail=str(e))

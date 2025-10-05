@@ -41,6 +41,8 @@ pyyaml==6.0.1
 # Text normalization
 unidecode==1.4.0
 
+# Airport/City code mapping (custom implementation)
+
 # Date/Time
 python-dateutil==2.8.2
 

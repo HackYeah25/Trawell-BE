@@ -19,6 +19,21 @@ class WeatherService:
         self.api_key = settings.weather_api_key
         self.base_url = "http://api.weatherapi.com/v1"
         
+    def get_forecast_sync(
+        self, 
+        city: str,
+        days: int = 7
+    ) -> Dict[str, Any]:
+        """Synchronous wrapper for get_forecast"""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(self.get_forecast(city=city, days=days))
+
     async def get_forecast(
         self, 
         city: str,

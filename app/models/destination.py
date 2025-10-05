@@ -104,8 +104,9 @@ class DestinationRecommendation(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "extra": "ignore",  # Ignore extra fields from database
+        "json_schema_extra": {
             "example": {
                 "recommendation_id": "rec_123",
                 "user_id": "user_456",
@@ -127,6 +128,7 @@ class DestinationRecommendation(BaseModel):
                 "status": "suggested"
             }
         }
+    }
 
 
 class BrainstormRequest(BaseModel):

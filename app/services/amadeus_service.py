@@ -479,6 +479,42 @@ class AmadeusService:
     # TRIP AGGREGATION
     # ============================================================================
 
+    def get_trip_details_sync(
+        self,
+        destination: str,
+        origin: str = "JFK",
+        departure_date: Optional[str] = None,
+        return_date: Optional[str] = None,
+        adults: int = 1,
+        travel_class: Optional[str] = None,
+        nonstop: bool = True,
+        hotel_radius: int = 5,
+        hotel_radius_unit: str = "KM",
+        room_quantity: int = 1,
+    ) -> Dict[str, Any]:
+        """Synchronous wrapper for get_trip_details. Returns flights and hotels."""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(
+            self.get_trip_details(
+                origin=origin,
+                destination=destination,
+                departure_date=departure_date,
+                return_date=return_date,
+                adults=adults,
+                travel_class=travel_class,
+                nonstop=nonstop,
+                hotel_radius=hotel_radius,
+                hotel_radius_unit=hotel_radius_unit,
+                room_quantity=room_quantity,
+            )
+        )
+
     async def get_trip_details(
         self,
         origin: str,
@@ -642,8 +678,13 @@ class AmadeusService:
                 check_out_date = _date_str(parsed_in + timedelta(days=2))
 
         # Hotels in destination city using dates
+        # Use airport service for proper city code mapping
+        from app.services.airport_service import get_airport_service
+        airport_service = get_airport_service()
+        city_code = airport_service.get_airport_code(destination)
+        
         hotels = await self.get_hotel_offers_for_city(
-            city_code=destination[:3],
+            city_code=city_code,
             check_in_date=check_in_date,
             check_out_date=check_out_date,
             adults=adults,
