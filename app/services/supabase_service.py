@@ -19,9 +19,14 @@ class SupabaseService:
 
     def __init__(self):
         self.client: Optional[Client] = None
+        self._initialized = False
 
-    def init(self):
-        """Initialize Supabase client"""
+    def _ensure_initialized(self):
+        """Lazy initialization of Supabase client"""
+        if self._initialized:
+            return
+        
+        self._initialized = True
         try:
             if not settings.supabase_url or settings.supabase_url == "your_supabase_url_here":
                 print("WARNING: Supabase not configured, skipping initialization")
@@ -36,9 +41,14 @@ class SupabaseService:
             print(f"WARNING: Failed to initialize Supabase client: {e}")
             self.client = None
 
+    def init(self):
+        """Initialize Supabase client (for backwards compatibility)"""
+        self._ensure_initialized()
+
     # User Profile Operations
     async def get_user(self, user_id: str) -> Optional[User]:
         """Fetch user and map to API User: {id, name, email?, onboardingCompleted}."""
+        self._ensure_initialized()
         if not self.client:
             raise Exception("Supabase client not initialized")
         try:
@@ -51,6 +61,7 @@ class SupabaseService:
 
     async def update_user(self, user_id: str, fields: Dict[str, Any]) -> User:
         """Update user with whatever fields are provided; returns updated User."""
+        self._ensure_initialized()
         if not self.client:
             raise Exception("Supabase client not initialized")
         try:
@@ -79,6 +90,7 @@ class SupabaseService:
         Returns None if profile doesn't exist - caller must handle this case.
         No fallback profiles are provided.
         """
+        self._ensure_initialized()
         if not self.client:
             raise Exception("Supabase client not initialized")
         try:
@@ -92,6 +104,7 @@ class SupabaseService:
 
     async def has_completed_profiling(self, user_id: str) -> bool:
         """Check if user has completed profiling"""
+        self._ensure_initialized()
         if not self.client:
             raise Exception("Supabase client not initialized")
         try:
@@ -107,6 +120,7 @@ class SupabaseService:
 
     async def create_user_profile(self, profile: UserProfile) -> UserProfile:
         """Create new user profile"""
+        self._ensure_initialized()
         if not self.client:
             raise Exception("Supabase client not initialized")
         try:
@@ -118,6 +132,7 @@ class SupabaseService:
 
     async def update_user_profile(self, user_id: str, profile: UserProfile) -> UserProfile:
         """Update existing user profile"""
+        self._ensure_initialized()
         try:
             profile.updated_at = datetime.utcnow()
             data = profile.model_dump(mode="json")
@@ -129,6 +144,7 @@ class SupabaseService:
     # Conversation Operations
     async def get_conversation(self, conversation_id: str) -> Optional[Conversation]:
         """Fetch conversation by ID"""
+        self._ensure_initialized()
         try:
             response = self.client.table("conversations").select("*").eq("conversation_id", conversation_id).execute()
             if response.data:
@@ -139,6 +155,7 @@ class SupabaseService:
 
     async def create_conversation(self, conversation: Conversation) -> Conversation:
         """Create new conversation"""
+        self._ensure_initialized()
         try:
             data = conversation.model_dump(mode="json")
             response = self.client.table("conversations").insert(data).execute()
@@ -148,6 +165,7 @@ class SupabaseService:
 
     async def add_message(self, conversation_id: str, message: Message) -> Conversation:
         """Add message to conversation"""
+        self._ensure_initialized()
         try:
             # Fetch current conversation
             conv = await self.get_conversation(conversation_id)
@@ -167,6 +185,7 @@ class SupabaseService:
 
     async def get_user_conversations(self, user_id: str, module: Optional[str] = None) -> List[Conversation]:
         """Get all conversations for a user"""
+        self._ensure_initialized()
         try:
             query = self.client.table("conversations").select("*").eq("user_id", user_id)
             if module:
@@ -179,6 +198,7 @@ class SupabaseService:
     # Trip Plan Operations
     async def create_trip_plan(self, trip: TripPlan) -> TripPlan:
         """Create new trip plan"""
+        self._ensure_initialized()
         try:
             data = trip.model_dump(mode="json")
             response = self.client.table("trip_plans").insert(data).execute()
@@ -188,6 +208,7 @@ class SupabaseService:
 
     async def get_trip_plan(self, trip_id: str) -> Optional[TripPlan]:
         """Fetch trip plan by ID"""
+        self._ensure_initialized()
         try:
             response = self.client.table("trip_plans").select("*").eq("trip_id", trip_id).execute()
             if response.data:
@@ -198,6 +219,7 @@ class SupabaseService:
 
     async def update_trip_plan(self, trip_id: str, trip: TripPlan) -> TripPlan:
         """Update trip plan"""
+        self._ensure_initialized()
         try:
             trip.updated_at = datetime.utcnow()
             data = trip.model_dump(mode="json")
@@ -208,6 +230,7 @@ class SupabaseService:
 
     async def get_user_trips(self, user_id: str) -> List[TripPlan]:
         """Get all trips for a user"""
+        self._ensure_initialized()
         try:
             response = self.client.table("trip_plans").select("*").eq("user_id", user_id).execute()
             return [TripPlan(**trip) for trip in response.data]

@@ -7,7 +7,7 @@ channel = "stable-25_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]
+run = ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
 
 [workflows]
 runButton = "Project"
@@ -40,3 +40,7 @@ externalPort = 80
 [[ports]]
 localPort = 34721
 externalPort = 3000
+
+[[ports]]
+localPort = 43403
+externalPort = 3001
