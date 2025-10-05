@@ -26,9 +26,9 @@ export const TripCard = ({ trip, onViewTrip, className }: TripCardProps) => {
       <div className="flex items-start gap-3">
         {/* Trip Image */}
         <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-warm-coral/20 to-warm-turquoise/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
-          {trip.imageUrl ? (
+          {(trip.url || trip.imageUrl) ? (
             <img
-              src={trip.imageUrl}
+              src={trip.url || trip.imageUrl}
               alt={trip.title}
               className="w-full h-full object-cover"
             />

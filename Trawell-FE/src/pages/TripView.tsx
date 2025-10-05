@@ -32,7 +32,6 @@ export default function TripView() {
   const [editedTitle, setEditedTitle] = useState('');
   const [currentStreamingMessage, setCurrentStreamingMessage] = useState<string>('');
   const [isAIResponding, setIsAIResponding] = useState(false);
-  const [currentPhotos, setCurrentPhotos] = useState<Array<{ query: string; caption: string; url: string }>>([]);
   const isMobile = useIsMobile();
 
   const { data: trip } = useTrip(tripId!);
@@ -59,26 +58,34 @@ export default function TripView() {
     setCurrentStreamingMessage('');
   }, []);
 
+  // Store pending photos that arrived before the message
+  const pendingPhotosRef = useRef<Array<{ query: string; caption: string; url: string }>>([]);
+
   const handlePlanningComplete = useCallback((content: string) => {
     console.log('Planning response complete');
     setIsAIResponding(false);
-    
-    // Add complete AI message to chat
+
+    // Add complete AI message to chat, including any pending photos
     const aiMessage: ChatMessage = {
       id: `ai-${Date.now()}`,
       role: 'assistant',
       markdown: content,
       createdAt: new Date().toISOString(),
+      photos: pendingPhotosRef.current.length > 0 ? pendingPhotosRef.current : undefined,
     };
-    
+
     setLocalMessages((prev) => [...prev, aiMessage]);
     setCurrentStreamingMessage('');
+
+    // Clear pending photos after using them
+    pendingPhotosRef.current = [];
   }, []);
 
   const handlePlanningError = useCallback((error: string) => {
     console.error('Planning error:', error);
     setIsAIResponding(false);
     setCurrentStreamingMessage('');
+    pendingPhotosRef.current = [];
   }, []);
 
   const handleTripUpdated = useCallback((updates: any[]) => {
@@ -87,8 +94,10 @@ export default function TripView() {
   }, []);
 
   const handlePhotos = useCallback((photos: Array<{ query: string; caption: string; url: string }>) => {
-    console.log('📸 Photos received:', photos);
-    setCurrentPhotos(photos);
+    console.log('📸 Photos received (storing for next message):', photos);
+
+    // Store photos to be attached when the complete message arrives
+    pendingPhotosRef.current = photos;
   }, []);
 
   // Initialize Planning WebSocket
@@ -311,27 +320,6 @@ export default function TripView() {
                     onLoadMore={loadMore}
                     remainingCount={remainingCount}
                   />
-
-                  {/* Inline Photos */}
-                  {currentPhotos.length > 0 && !isAIResponding && (
-                    <div className="max-w-4xl mx-auto px-4 mt-4 space-y-3">
-                      {currentPhotos.map((photo, index) => (
-                        <div key={index} className="rounded-lg overflow-hidden shadow-lg border border-warm-coral/20">
-                          <img
-                            src={photo.url}
-                            alt={photo.caption}
-                            className="w-full h-64 object-cover"
-                            loading="lazy"
-                          />
-                          {photo.caption && (
-                            <div className="bg-card/95 backdrop-blur p-3 text-sm text-muted-foreground border-t border-warm-coral/10">
-                              📸 {photo.caption}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             }

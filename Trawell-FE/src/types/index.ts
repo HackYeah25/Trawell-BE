@@ -44,6 +44,11 @@ export interface ChatMessage {
     locationName: string;
     createdAt: string;
   };
+  photos?: Array<{
+    query: string;
+    caption: string;
+    url: string;
+  }>;
 }
 
 export interface User {
@@ -220,7 +225,8 @@ export interface TripCard {
   id: string;
   title: string;
   locationName: string;
-  imageUrl?: string;
+  imageUrl?: string; // Legacy field
+  url?: string; // Google Places photo URL
   createdAt: string;
   rating?: 1 | 2 | 3;
 }

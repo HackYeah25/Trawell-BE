@@ -190,6 +190,27 @@ export const ChatMessage = memo(function ChatMessage({
               />
             </div>
           )}
+
+          {/* Inline Photos */}
+          {message.photos && message.photos.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {message.photos.map((photo, index) => (
+                <div key={index} className="rounded-lg overflow-hidden shadow-md border border-warm-coral/20">
+                  <img
+                    src={photo.url}
+                    alt={photo.caption}
+                    className="w-full h-48 object-cover"
+                    loading="lazy"
+                  />
+                  {photo.caption && (
+                    <div className="bg-card/95 backdrop-blur p-2 text-xs text-muted-foreground border-t border-warm-coral/10">
+                      📸 {photo.caption}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {message.quickReplies && message.quickReplies.length > 0 && (
