@@ -33,23 +33,16 @@ async def get_me(current_user: TokenData = Depends(get_current_user)) -> User:
     # Fallback minimal user using token data
     return User(
         id=user_id,
-        email=current_user.email,
-        username=(current_user.email.split("@")[0] if current_user.email and "@" in current_user.email else "user"),
-        is_active=True,
-        is_verified=False,
+        name=db_user.name,
+        email=db_user.email,
+        onboardingCompleted=db_user.onboardingCompleted,
     )
 
 
-class APIUserUpdate(BaseModel):
-    email: Optional[str] = None
-    username: Optional[str] = None
-    full_name: Optional[str] = None
-    is_active: Optional[bool] = None
-    is_verified: Optional[bool] = None
 
 
 @router.patch("/me", response_model=User)
-async def patch_me(update: APIUserUpdate, current_user: TokenData = Depends(get_current_user)) -> User:
+async def patch_me(update: User, current_user: TokenData = Depends(get_current_user)) -> User:
     """Update allowed User fields in Supabase and return updated User."""
     supabase = get_supabase()
 
