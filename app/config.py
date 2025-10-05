@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     environment: str = "development"
     debug: bool = True
-    port: int = 8000
+    port: int = 5000
     host: str = "0.0.0.0"
 
     # API Keys
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     max_tokens_response: int = 2000
 
     # CORS
-    allowed_origins: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
+    allowed_origins: str = "*"
 
     # Logging
     log_level: str = "INFO"
