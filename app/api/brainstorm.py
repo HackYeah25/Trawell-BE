@@ -761,17 +761,17 @@ async def get_recommendation_by_id(
 @router.post("/session/{session_id}/recommendation/")
 async def update_recommendation(
     id: str, 
-    rating: Rating,
+    rating: int,
     current_user: Optional[TokenData] = Depends(get_current_user_optional),
     **kwargs):
     """Update recommendation for a session"""
     user_id = current_user.user_id if current_user else TEST_USER_ID
     supabase = get_supabase()
-
+    rating_enum = Rating(rating)
     try:
         if not supabase.client:
             raise HTTPException(status_code=500, detail="Database not available")
-        if rating is Rating.ZERO_STARS:
+        if rating_enum is Rating.ZERO_STARS:
             # delete recommendation
             supabase.client.table("destination_recommendations"
             ).delete().eq("recommendation_id", id
@@ -779,7 +779,7 @@ async def update_recommendation(
             return {"message": "Recommendation deleted successfully"}
         else:
             response = supabase.client.table("destination_recommendations").update({
-                "rating": rating,
+                "rating": rating_enum,
                 "updated_at": datetime.utcnow().isoformat()
             }).eq("recommendation_id", id).eq("user_id", user_id).execute()
             return DestinationRecommendation(**response.data[0])
