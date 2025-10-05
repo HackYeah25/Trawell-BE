@@ -154,36 +154,7 @@ class SupabaseService:
             return [Conversation(**conv) for conv in response.data]
         except Exception as e:
             raise Exception(f"Error fetching user conversations: {str(e)}")
-
-    # Destination Recommendation Operations
-    async def create_recommendation(self, recommendation: DestinationRecommendation) -> DestinationRecommendation:
-        """Save destination recommendation"""
-        try:
-            data = recommendation.model_dump(mode="json")
-            response = self.client.table("destination_recommendations").insert(data).execute()
-            return DestinationRecommendation(**response.data[0])
-        except Exception as e:
-            raise Exception(f"Error saving recommendation: {str(e)}")
-
-    async def get_user_recommendations(self, user_id: str) -> List[DestinationRecommendation]:
-        """Get all recommendations for a user"""
-        try:
-            response = self.client.table("destination_recommendations").select("*").eq("user_id", user_id).execute()
-            return [DestinationRecommendation(**rec) for rec in response.data]
-        except Exception as e:
-            raise Exception(f"Error fetching recommendations: {str(e)}")
-
-    async def update_recommendation(self, recommendation_id: str, rating: Rating) -> DestinationRecommendation:
-        """Update recommendation status"""
-        try:
-            response = self.client.table("destination_recommendations").update({
-                "rating": rating,
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("recommendation_id", recommendation_id).execute()
-            return DestinationRecommendation(**response.data[0])
-        except Exception as e:
-            raise Exception(f"Error updating recommendation status: {str(e)}")
-
+            
     # Trip Plan Operations
     async def create_trip_plan(self, trip: TripPlan) -> TripPlan:
         """Create new trip plan"""

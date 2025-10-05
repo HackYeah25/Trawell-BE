@@ -241,17 +241,6 @@ Current date: {datetime.now().strftime('%Y-%m-%d')}
                 history.append({"role": "assistant", "content": message.content})
         return history
 
-    def get_recommendation(self, recommendation_id: str) -> DestinationRecommendation:
-        """Get recommendation for a session"""
-        recommendation_list = self.supabase.get_user_recommendations(self.user_profile.user_id)
-        recommendation = list(filter(lambda x: x.recommendation_id == recommendation_id, recommendation_list))[0]
-        return recommendation
-    
-    def update_recommendation(self, recommendation_id: str, rating: Rating):
-        """Update recommendation for a session"""
-        recommendation = self.supabase.update_recommendation(recommendation_id, rating)
-        return recommendation
-
     def clear_memory(self):
         """Clear conversation memory"""
         self.memory.clear()

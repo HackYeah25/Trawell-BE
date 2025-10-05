@@ -723,61 +723,34 @@ async def get_recommendation_by_id(
         print(f"ERROR fetching recommendation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/session/{session_id}/create_recommendation")
-async def create_recommendation(session_id: str,
-    current_user: Optional[TokenData] = Depends(get_current_user_optional)
-):
-    """Create recommendation for a session (legacy endpoint)"""
+@router.post("/session/{session_id}/recommendation/")
+async def update_recommendation(
+    id: str, 
+    rating: Rating,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional),
+    **kwargs):
+    """Update recommendation for a session"""
     user_id = current_user.user_id if current_user else TEST_USER_ID
     supabase = get_supabase()
 
     try:
         if not supabase.client:
             raise HTTPException(status_code=500, detail="Database not available")
-        recomendation = DestinationRecommendation(
-            recommendation_id=uuid.uuid4(),
-            user_id=user_id,
-            destination=DestinationInfo(
-                name="",
-                country="",
-                region="",
-                coordinates=None,
-                description=None
-            ),
-            created_at=datetime.now(),
-            updated_at=datetime.now()
-        )
-        result = supabase.create_recommendation(recomendation)
-        return result
+        if rating is Rating.ZERO_STARS:
+            # delete recommendation
+            supabase.client.table("destination_recommendations"
+            ).delete().eq("recommendation_id", id
+            ).eq("user_id", user_id).execute()
+            return {"message": "Recommendation deleted successfully"}
+        else:
+            response = supabase.client.table("destination_recommendations").update({
+                "rating": rating,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("recommendation_id", id).eq("user_id", user_id).execute()
+            return DestinationRecommendation(**response.data[0])
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"ERROR creating recommendation: {e}")
+        print(f"ERROR fetching recommendation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/session/{session_id}/recommendation")
-async def get_recommendation(session_id: str,
-    current_user: Optional[TokenData] = Depends(get_current_user_optional)
-):
-    """Get recommendation for a session"""
-    if session_id not in active_agents:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    agent = active_agents[session_id]
-    recommendation = agent.get_recommendation()
-    return recommendation
-
-@router.post("/session/{session_id}/recommendation/")
-async def update_recommendation(
-    session_id: str,
-    id: str, 
-    current_user: Optional[TokenData] = Depends(get_current_user_optional)
-    rating: Rating,
-    **kwargs):
-    """Update recommendation for a session"""
-    if session_id not in active_agents:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    agent = active_agents[session_id]
-    recommendation = agent.update_recommendation(id, rating)
-    return recommendation
