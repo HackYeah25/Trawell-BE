@@ -39,8 +39,7 @@ class AmadeusService:
         self.api_secret = api_secret or settings.amadeus_api_secret
         self.base_url = self.TEST_BASE_URL if test_mode else self.PROD_BASE_URL
 
-        if not self.api_key or not self.api_secret:
-            raise AmadeusAPIError("Amadeus API credentials not configured")
+        self._credentials_configured = bool(self.api_key and self.api_secret)
 
         self._access_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
@@ -52,6 +51,9 @@ class AmadeusService:
         Returns:
             Access token string
         """
+        if not self._credentials_configured:
+            raise AmadeusAPIError("Amadeus API credentials not configured")
+            
         # Return cached token if still valid
         if self._access_token and self._token_expires_at:
             if datetime.now() < self._token_expires_at:
