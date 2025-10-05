@@ -1,0 +1,151 @@
+# On-site support module prompts
+
+support_system: |
+  You are a helpful on-the-ground travel assistant. The user is currently at their
+  destination and needs real-time help and suggestions.
+
+  Guidelines:
+  - Be immediately practical and actionable
+  - Consider current time, weather, and location
+  - Provide specific addresses and directions
+  - Include opening hours for current day
+  - Suggest nearby alternatives
+  - Be concise - they're on the go!
+
+support_chat: |
+  The user is currently in {destination}.
+
+  Current context:
+  - Location: {current_location}
+  - Time: {current_time}
+  - Weather: {current_weather}
+
+  User's request: {user_message}
+
+  Their itinerary for today: {today_itinerary}
+
+  Provide helpful, actionable advice.
+
+daily_plan: |
+  The user wants a plan for today in {destination}.
+
+  Context:
+  - Current time: {current_time}
+  - Weather: {current_weather}
+  - User's mood/preference: {user_preference}
+  - Already visited: {visited_places}
+
+  Suggest:
+  - 3-4 activities or places for today
+  - Specific timing recommendations
+  - Where to eat (breakfast/lunch/dinner)
+  - How to get around
+  - What to bring/wear
+
+nearby_recommendations: |
+  User is near {current_location} in {destination}.
+
+  They want recommendations for:
+  - {recommendation_type}
+
+  Find nearby options (walking distance preferred):
+  - Name and exact location
+  - Distance from current location
+  - Opening hours TODAY
+  - Price range
+  - Why it's worth visiting now
+  - How to get there
+
+emergency_info: |
+  Provide emergency information for {destination}:
+
+  - Emergency numbers (police, ambulance, fire)
+  - Nearest hospital/clinic to {current_location}
+  - 24/7 pharmacies
+  - Embassy/consulate information for {nationality}
+  - Tourist police
+  - Lost passport procedure
+  - How to report theft
+  - Emergency phrases in local language
+
+restaurant_now: |
+  User wants to eat near {current_location}.
+
+  Current time: {current_time}
+  Preferences: {food_preferences}
+  Budget: {budget_level}
+
+  Suggest restaurants that are:
+  - OPEN right now
+  - Within 10-15 min walk
+  - Match their food preferences
+  - Good quality and safe
+
+  For each:
+  - Name and cuisine
+  - Address and how to get there
+  - Why you recommend it
+  - Price range
+  - If reservation needed
+
+weather_adapted_plan: |
+  The weather changed! Current conditions: {current_weather}
+
+  Original plan for today: {original_plan}
+
+  Suggest adapted activities:
+  - Indoor alternatives if raining
+  - Shade/cool options if too hot
+  - What to do in current conditions
+  - How to salvage the day
+
+local_apps_tools: |
+  Recommend useful local apps and tools for {destination}:
+
+  - Transport apps (metro, bus, ride-share)
+  - Food delivery
+  - Translation apps
+  - Local deal apps
+  - Navigation (beyond Google Maps)
+  - Payment apps
+  - Wifi finding apps
+  - Anything else locally useful
+
+quick_tips: |
+  User needs quick practical tips for {destination}:
+
+  - Where to find clean bathrooms
+  - Free wifi spots
+  - ATM locations and fees
+  - Phone SIM card recommendations
+  - Tap water - safe to drink?
+  - Power adapter type
+  - Tipping practices
+  - Bargaining customs
+  - Scams to watch for
+
+last_minute_changes: |
+  User needs to change plans last minute:
+
+  Current situation: {current_situation}
+  Problem: {problem}
+  What they need: {need}
+
+  Provide:
+  - Quick alternative solutions
+  - How to handle the situation
+  - Who to contact if needed
+  - Backup options
+
+photo_spots: |
+  User wants to know the best photo spots in {destination}.
+
+  Current location: {current_location}
+
+  Suggest:
+  - Nearby photo-worthy locations
+  - Best time of day for photos there
+  - Specific vantage points
+  - Instagram-famous spots
+  - Hidden gem photo locations
+  - Sunset/sunrise spots

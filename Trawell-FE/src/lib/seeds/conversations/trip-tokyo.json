@@ -1,0 +1,88 @@
+[
+  {
+    "id": "msg-tokyo-001",
+    "role": "assistant",
+    "markdown": "Witajcie w **Trip: Tokio**! 🗼\n\nPrzygotowałem dla Was listę must-see atrakcji na 5 dni. Oceńcie, co Was interesuje, a dopasuję szczegółowy plan! 😊",
+    "createdAt": "2024-12-10T10:10:00Z"
+  },
+  {
+    "id": "msg-tokyo-002",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Super! Czekam na propozycje 🤩",
+    "createdAt": "2024-12-10T10:15:00Z"
+  },
+  {
+    "id": "msg-tokyo-003",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Przyjęłam Senso-ji Temple ✅",
+    "createdAt": "2024-12-10T11:00:00Z"
+  },
+  {
+    "id": "msg-tokyo-004",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Ja też! I Tsukiji Market - uwielbiam food markets! 🍣",
+    "createdAt": "2024-12-10T11:30:00Z"
+  },
+  {
+    "id": "msg-tokyo-005",
+    "role": "assistant",
+    "markdown": "Świetnie! **Zaakceptowane atrakcje:**\n\n✅ Sensō-ji Temple (Asakusa)\n✅ Tsukiji Outer Market\n\nCo z **Shibuya Crossing** i **Meiji Shrine**? To klasyki Tokio! 🏯",
+    "createdAt": "2024-12-10T12:00:00Z"
+  },
+  {
+    "id": "msg-tokyo-006",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Shibuya tak! Meiji Shrine też, jeśli jest tam hiking trail? 🌳",
+    "createdAt": "2024-12-10T13:00:00Z"
+  },
+  {
+    "id": "msg-tokyo-007",
+    "role": "assistant",
+    "markdown": "**Meiji Shrine** ma piękny **forest trail** (Meiji Jingu Gyoen) - 70 hektarów lasu w środku Tokio! 🌲\n\nSpacер zajmuje ~2h, bardzo relaksujący. Plus można połączyć z **Yoyogi Park** obok.\n\nDodaję jako atrakcję! ✅",
+    "createdAt": "2024-12-10T13:15:00Z"
+  },
+  {
+    "id": "msg-tokyo-008",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "A co z **teamLab Borderless**? Słyszałam, że to niesamowite digital art museum! 🎨",
+    "createdAt": "2024-12-10T14:00:00Z"
+  },
+  {
+    "id": "msg-tokyo-009",
+    "role": "assistant",
+    "markdown": "**teamLab Borderless** to MUST! 🌈\n\nInteraktywne instalacje art+tech, Instagram heaven. Tylko trzeba zarezerwować bilety z wyprzedzeniem (sold out weeks ahead!).\n\n**Protip:** Idźcie wieczorem - mniej ludzi, piękniejsze światła.\n\nDodaję do listy! ✨",
+    "createdAt": "2024-12-10T14:15:00Z"
+  },
+  {
+    "id": "msg-tokyo-010",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Sounds cool! Akceptuję 👍",
+    "createdAt": "2024-12-10T15:00:00Z"
+  },
+  {
+    "id": "msg-tokyo-011",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "I ja! A **Harajuku** do shoppingu? 🛍️",
+    "createdAt": "2024-12-10T16:00:00Z"
+  },
+  {
+    "id": "msg-tokyo-012",
+    "role": "assistant",
+    "markdown": "**Harajuku** = fashion heaven! 👘\n\n**Takeshita Street** - kawaii culture, vintage shops\n**Omotesando** - luksusowe butiki (Prada, Dior, local designers)\n**Cat Street** - indie brands, cozy cafes\n\nPerfect dla Marii! Dodaję jako atrakcję 😊\n\nDla Anny: w Harajuku jest **Togo Shrine** z hiking trail na wzgórze! ⛩️",
+    "createdAt": "2024-12-10T16:15:00Z"
+  },
+  {
+    "id": "msg-tokyo-013",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Togo Shrine trail? Perfect! 🥾",
+    "createdAt": "2024-12-10T17:00:00Z"
+  }
+]

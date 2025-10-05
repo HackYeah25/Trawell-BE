@@ -1,0 +1,24 @@
+run = "bash run.sh"
+entrypoint = "README.md"
+modules = ["python-3.11", "nodejs-20"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["bash", "run.sh"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+exposeLocalhost = true
+
+[[ports]]
+localPort = 5173
+externalPort = 80
+exposeLocalhost = true
+
+[env]
+PYTHONPATH = "${REPL_HOME}/Trawell-BE:${PYTHONPATH}"
+PATH = "${REPL_HOME}/Trawell-BE:${PATH}"

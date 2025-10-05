@@ -1,0 +1,42 @@
+{
+  "name": "trawell-monorepo",
+  "version": "1.0.0",
+  "description": "TraWell - AI-powered travel planning application",
+  "private": true,
+  "workspaces": [
+    "Trawell-BE",
+    "Trawell-FE"
+  ],
+  "scripts": {
+    "install:all": "npm install && cd Trawell-BE && npm install && cd ../Trawell-FE && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd Trawell-BE && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:frontend": "cd Trawell-FE && npm run dev -- --host 0.0.0.0 --port 5173",
+    "start": "npm run dev",
+    "build:frontend": "cd Trawell-FE && npm run build",
+    "backend": "npm run dev:backend",
+    "frontend": "npm run dev:frontend",
+    "setup": "bash setup.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/trawell.git"
+  },
+  "keywords": [
+    "travel",
+    "ai",
+    "planning",
+    "fastapi",
+    "react",
+    "vite"
+  ],
+  "author": "TraWell Team",
+  "license": "MIT"
+}

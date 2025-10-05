@@ -1,0 +1,120 @@
+[
+  {
+    "id": "trip-krakow-001",
+    "role": "assistant",
+    "markdown": "Cześć! 👋 Widzę, że planujecie wspólną podróż do Krakowa. Jestem tu, żeby pomóc Wam stworzyć idealny plan! \n\nKto z Was będzie głównym koordynatorem tej wyprawy?",
+    "createdAt": "2025-01-10T10:00:00Z"
+  },
+  {
+    "id": "trip-krakow-002",
+    "role": "user",
+    "markdown": "Hej! Będzie nas czworo: ja (Ania - koordynuję), Kasia (foodie), Marek (historyk-amator) i Tomek (fotograf). Jedziemy na długi weekend 14-17 lutego.",
+    "createdAt": "2025-01-10T10:02:00Z",
+    "userId": "user-anna",
+    "userName": "Ania"
+  },
+  {
+    "id": "trip-krakow-003",
+    "role": "assistant",
+    "markdown": "Super ekipa! 🎉 Widzę różne zainteresowania - to świetnie!\n\n**Aniu**, jako koordynator - jaki macie budżet na osobę i gdzie planujesz nocleg (Stare Miasto vs. Kazimierz)?\n\n**Kasiu**, jakie kuchnie Cię interesują? Kraków ma świetne foodie spots od tradycyjnej kuchni po fusion.\n\n**Marku**, bardziej interesuje Cię historia średniowiecza czy może też XX wiek?\n\n**Tomku**, szukasz miejsc instagramowych czy raczej autentycznych klimatów?",
+    "createdAt": "2025-01-10T10:03:00Z"
+  },
+  {
+    "id": "trip-krakow-004",
+    "role": "user",
+    "markdown": "Kasia: Tradycyjna polska kuchnia + jakieś nowoczesne twisty! Chcę spróbować wszystkiego 😋",
+    "createdAt": "2025-01-10T10:05:00Z",
+    "userId": "user-kasia",
+    "userName": "Kasia"
+  },
+  {
+    "id": "trip-krakow-005",
+    "role": "user",
+    "markdown": "Marek: Interesuje mnie głównie średniowiecze i renesans, ale chętnie zobaczę też Fabrykę Schindlera.",
+    "createdAt": "2025-01-10T10:06:00Z",
+    "userId": "user-marek",
+    "userName": "Marek"
+  },
+  {
+    "id": "trip-krakow-006",
+    "role": "user",
+    "markdown": "Tomek: Oba! Lubię uchwycić autentyczne momenty, ale kilka ikonicznych kadrów też się przyda 📸",
+    "createdAt": "2025-01-10T10:07:00Z",
+    "userId": "user-tomek",
+    "userName": "Tomek"
+  },
+  {
+    "id": "trip-krakow-007",
+    "role": "user",
+    "markdown": "Ania: Budżet ~500 zł/osobę (bez noclegu). Nocleg mamy już w Kazimierzu - świetna lokalizacja!",
+    "createdAt": "2025-01-10T10:08:00Z",
+    "userId": "user-anna",
+    "userName": "Ania"
+  },
+  {
+    "id": "trip-krakow-008",
+    "role": "assistant",
+    "markdown": "Ekstra! Mam już kilka pomysłów 💡\n\n**Dla Kasi (foodie):**\n- Stary Kleparz - autentyczny targ z regionalnymi produktami\n- Restauracja Pod Baranami - tradycyjna kuchnia w nowoczesnym wydaniu\n- Zapiekanka na Placu Nowym (must-have!) \n\n**Dla Marka (historia):**\n- Wawel - zamek + katedra (absolutna podstawa)\n- Rynek Główny + Sukiennice (serce średniowiecznego Krakowa)\n- Fabryka Schindlera (rezerwacja online z wyprzedzeniem!)\n\n**Dla Tomka (fotografia):**\n- Golden hour na Wawelu\n- Street art w Kazimierzu\n- Ulica Kanonicza (najstarsza, najpiękniejsza)\n\n**Wspólnie:**\n- Spacer po Plantach\n- Kazimierz wieczorem (klimatyczne kafelki + street food)\n\nCo myślicie o tym podziale? Chcecie, żebym zaproponował konkretny plan na każdy dzień z uwzględnieniem waszych ról?",
+    "createdAt": "2025-01-10T10:12:00Z"
+  },
+  {
+    "id": "trip-krakow-009",
+    "role": "user",
+    "markdown": "Kasia: Zapiekanka MUST! 🌮 A czy są jakieś food toury?",
+    "createdAt": "2025-01-10T10:14:00Z",
+    "userId": "user-kasia",
+    "userName": "Kasia"
+  },
+  {
+    "id": "trip-krakow-010",
+    "role": "user",
+    "markdown": "Marek: Super! Tylko pamiętajmy o rezerwacji na Wawel i Fabrykę - ja mogę to ogarnąć.",
+    "createdAt": "2025-01-10T10:15:00Z",
+    "userId": "user-marek",
+    "userName": "Marek"
+  },
+  {
+    "id": "trip-krakow-011",
+    "role": "user",
+    "markdown": "Ania: Brzmi świetnie! Tak, poproszę o plan na każdy dzień. Może ułożymy go tak, żeby każdy z nas miał \"swój\" moment?",
+    "createdAt": "2025-01-10T10:16:00Z",
+    "userId": "user-anna",
+    "userName": "Ania"
+  },
+  {
+    "id": "trip-krakow-012",
+    "role": "assistant",
+    "markdown": "Idealnie! Tworzymy plan gdzie każdy będzie \"przewodnikiem\" na swojej działce 🎯\n\n**PIĄTEK (14.02) - Dzień Marka 📚**\nMarcin prowadzi nas przez historię:\n- 10:00 - Wawel (zamek + smocza jama)\n- 13:00 - Lunch: Restauracja Wierzynek (historyczne wnętrza!)\n- 15:00 - Rynek + Sukiennice\n- 18:00 - Kasia przejmuje: Food tour po Kazimierzu\n- 21:00 - Kolacja: Hamsa (izraelska kuchnia)\n\n**SOBOTA (15.02) - Dzień Kasi + Tomka 🍽️📸**\n- 8:00 - Kasia prowadzi: Stary Kleparz (targ śniadaniowy)\n- 10:30 - Tomek przejmuje: Photo walk Kazimierz (street art)\n- 13:00 - Lunch: Alchemia (klimat!)\n- 15:00 - Fabryka Schindlera (Marek prowadzi)\n- 18:00 - Golden hour na Kopcu Krakusa (Tomek)\n- 20:00 - Plac Nowy: zapiekanki + craft beer\n\n**NIEDZIELA (16.02) - Dzień Tomka + relaks 📷**\n- 9:00 - Tomek prowadzi: Sunrise photography na Błoniach\n- 11:00 - Brunch: Charlotte (francuska kuchnia)\n- 13:00 - Spacer Planty (wszyscy razem)\n- 16:00 - Ania koordynuje: podsumowanie + planowanie powrotu\n\nCo myślicie? Chcecie coś zmienić w tym układzie?",
+    "createdAt": "2025-01-10T10:20:00Z"
+  },
+  {
+    "id": "trip-krakow-013",
+    "role": "user",
+    "markdown": "Tomek: Sunrise na Błoniach - genialne! 🌅 Tylko będzie zimno, pamiętajcie o ciepłych ubraniach.",
+    "createdAt": "2025-01-10T10:22:00Z",
+    "userId": "user-tomek",
+    "userName": "Tomek"
+  },
+  {
+    "id": "trip-krakow-014",
+    "role": "user",
+    "markdown": "Kasia: Hamsa i Charlotte - dodaję do listy! 😍 Może dodamy jeszcze obwarzanki na Rynku?",
+    "createdAt": "2025-01-10T10:23:00Z",
+    "userId": "user-kasia",
+    "userName": "Kasia"
+  },
+  {
+    "id": "trip-krakow-015",
+    "role": "user",
+    "markdown": "Ania: Idealnie! Marek, zajmiesz się rezerwacjami na Wawel i Fabrykę? Ja ogarnie transport.",
+    "createdAt": "2025-01-10T10:24:00Z",
+    "userId": "user-anna",
+    "userName": "Ania"
+  },
+  {
+    "id": "trip-krakow-016",
+    "role": "assistant",
+    "markdown": "Super podział zadań! 👏\n\n**AKCJE DO WYKONANIA:**\n\n✅ **Marek** - Rezerwacje:\n- Wawel: [wawel.krakow.pl](https://wawel.krakow.pl) (bilety online)\n- Fabryka Schindlera: minimum tydzień przed (popularny termin!)\n\n✅ **Ania** - Transport:\n- Bus/pociąg do Krakowa\n- Krakowska Karta Miejska (3-dniowa, ~50 zł) - opłacalna!\n\n✅ **Kasia** - Food research:\n- Obwarzanki: spróbujcie u pana Stanisława na Rynku (róg Floriańskiej)\n- Dodaj do listy: mleczarnia Jadelnia u Stryja (tradycyjna polska kuchnia)\n\n✅ **Tomek** - Equipment check:\n- Powerbanki (dużo zdjęć = szybko siada bateria)\n- Dodatkowe karty pamięci\n\nChcecie, żebym przygotował szczegółową mapę z zaznaczonymi punktami? Mogę też dodać backup options na wypadek złej pogody! ☔",
+    "createdAt": "2025-01-10T10:28:00Z"
+  }
+]

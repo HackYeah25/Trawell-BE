@@ -1,0 +1,252 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Base colors - warm, sandy tones */
+    --background: 40 50% 97%;
+    --foreground: 25 30% 15%;
+
+    /* Cards and surfaces */
+    --card: 40 100% 99%;
+    --card-foreground: 25 30% 15%;
+
+    --popover: 40 100% 99%;
+    --popover-foreground: 25 30% 15%;
+
+    /* Primary - Coral/Sunset */
+    --primary: 16 90% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 16 90% 68%;
+
+    /* Secondary - Warm Sand */
+    --secondary: 40 35% 88%;
+    --secondary-foreground: 25 30% 15%;
+
+    /* Accent - Turquoise/Ocean */
+    --accent: 180 65% 55%;
+    --accent-foreground: 0 0% 100%;
+    --accent-glow: 180 65% 65%;
+
+    /* Muted */
+    --muted: 40 30% 92%;
+    --muted-foreground: 25 15% 45%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 40 25% 88%;
+    --input: 40 25% 88%;
+    --ring: 16 90% 58%;
+
+    /* Radius */
+    --radius: 1rem;
+
+    /* Gradients - warm vacation vibes */
+    --gradient-ocean: linear-gradient(135deg, hsl(180, 65%, 55%) 0%, hsl(200, 80%, 60%) 100%);
+    --gradient-sunset: linear-gradient(135deg, hsl(16, 90%, 58%) 0%, hsl(340, 82%, 52%) 100%);
+    --gradient-sky: linear-gradient(180deg, hsl(40, 100%, 97%) 0%, hsl(180, 65%, 95%) 100%);
+    --gradient-warm: linear-gradient(135deg, hsl(35, 100%, 65%) 0%, hsl(16, 90%, 58%) 100%);
+
+    /* Shadows */
+    --shadow-elegant: 0 10px 30px -10px hsl(16 90% 58% / 0.3);
+    --shadow-glow: 0 0 40px hsl(16 90% 68% / 0.4);
+
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Sidebar */
+    --sidebar-background: 40 50% 98%;
+    --sidebar-foreground: 25 30% 15%;
+    --sidebar-primary: 16 90% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 30% 92%;
+    --sidebar-accent-foreground: 25 30% 15%;
+    --sidebar-border: 40 25% 88%;
+    --sidebar-ring: 16 90% 58%;
+  }
+
+  .dark {
+    /* Base colors - warm dark tones */
+    --background: 25 25% 12%;
+    --foreground: 40 50% 95%;
+
+    /* Cards and surfaces */
+    --card: 25 25% 16%;
+    --card-foreground: 40 50% 95%;
+
+    --popover: 25 25% 16%;
+    --popover-foreground: 40 50% 95%;
+
+    /* Primary - Coral/Sunset (brighter for dark) */
+    --primary: 16 90% 62%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 16 90% 72%;
+
+    /* Secondary */
+    --secondary: 25 20% 20%;
+    --secondary-foreground: 40 50% 95%;
+
+    /* Accent - Turquoise/Ocean */
+    --accent: 180 65% 60%;
+    --accent-foreground: 0 0% 100%;
+    --accent-glow: 180 65% 70%;
+
+    /* Muted */
+    --muted: 25 20% 20%;
+    --muted-foreground: 40 20% 65%;
+
+    /* Destructive */
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 40 50% 95%;
+
+    /* Success */
+    --success: 142 70% 45%;
+    --success-foreground: 40 50% 95%;
+
+    /* Borders and inputs */
+    --border: 25 20% 24%;
+    --input: 25 20% 24%;
+    --ring: 16 90% 62%;
+
+    /* Sidebar */
+    --sidebar-background: 25 25% 10%;
+    --sidebar-foreground: 40 50% 95%;
+    --sidebar-primary: 16 90% 62%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 25 20% 18%;
+    --sidebar-accent-foreground: 40 50% 95%;
+    --sidebar-border: 25 20% 18%;
+    --sidebar-ring: 16 90% 62%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased font-poppins;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-poppins;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Focus states for accessibility */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  /* Chat bubble animations */
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.3s ease-out;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Gradient backgrounds */
+  .bg-gradient-ocean {
+    background: var(--gradient-ocean);
+  }
+
+  .bg-gradient-sunset {
+    background: var(--gradient-sunset);
+  }
+
+  .bg-gradient-sky {
+    background: var(--gradient-sky);
+  }
+
+  .bg-gradient-warm {
+    background: var(--gradient-warm);
+  }
+}

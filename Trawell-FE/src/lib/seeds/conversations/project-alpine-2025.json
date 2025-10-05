@@ -1,0 +1,143 @@
+[
+  {
+    "id": "msg-alpine-001",
+    "role": "assistant",
+    "markdown": "Witajcie w projekcie **Alpine Adventure 2025**! 🏔️\n\nWidzę, że macie dość zróżnicowane preferencje:\n- **Anna** preferuje intensywne aktywności górskie\n- **Tomasz** woli spokojniejsze atrakcje z mniejszym wysiłkiem\n- **Maria** jest gdzieś pośrodku z naciskiem na kulturę\n\nCzy moglibyście powiedzieć, co jest dla Was najważniejsze w tej wspólnej wyprawie? Chcę zaproponować lokalizacje, które zadowolą wszystkich! 😊",
+    "createdAt": "2025-01-10T08:05:00Z"
+  },
+  {
+    "id": "msg-alpine-002",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Cześć! Dla mnie najważniejsze są **góry i aktywność**. Marzyłam o via ferrata w Alpach Szwajcarskich! 🧗‍♀️ Ale oczywiście chcę, żeby wszyscy dobrze się bawili.",
+    "createdAt": "2025-01-10T09:15:00Z"
+  },
+  {
+    "id": "msg-alpine-003",
+    "role": "user",
+    "userName": "Tomasz Nowak",
+    "markdown": "Ja bym wolał coś bardziej **relaksowego** - może kolejki linowe, widoki, dobra restauracja na szczycie? 😅 Via ferrata to trochę za dużo dla mnie...",
+    "createdAt": "2025-01-10T10:30:00Z"
+  },
+  {
+    "id": "msg-alpine-004",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Hej! Ja bym chciała połączyć **piękne widoki** z odrobiną kultury - może jakieś górskie miasteczko z lokalną architekturą? A co do aktywności - jestem za średnim poziomem 🎨",
+    "createdAt": "2025-01-10T11:00:00Z"
+  },
+  {
+    "id": "msg-alpine-005",
+    "role": "assistant",
+    "markdown": "Świetnie! Widzę potencjał na kompromis 😊\n\n**Propozycja:** Region **Interlaken + Grindelwald** w Szwajcarii:\n\n✅ **Dla Anny:** Via ferrata Grindelwald First, trekking do lodowca\n✅ **Dla Tomasza:** Gondola na Jungfraujoch (\"szczyt Europy\"), restauracje z widokiem\n✅ **Dla Marii:** Urokliwe Interlaken i Lauterbrunnen, tradycyjne chalets\n\n**Budżet:** Średni-wysoki (Szwajcaria), ale można zoptymalizować noclegami w hostelach\n\nCo myślicie? Mogę też zaproponować **Dolomity** (Włochy) - tańsze, równie piękne! 🏔️",
+    "createdAt": "2025-01-10T11:30:00Z"
+  },
+  {
+    "id": "msg-alpine-006",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Interlaken brzmi SUPER! 🤩 A Dolomity też! Może porównajmy obie opcje pod kątem budżetu?",
+    "createdAt": "2025-01-10T12:00:00Z"
+  },
+  {
+    "id": "msg-alpine-007",
+    "role": "user",
+    "userName": "Tomasz Nowak",
+    "markdown": "Dla mnie Dolomity - włoskie jedzenie > szwajcarskie 😋 Plus tańsze!",
+    "createdAt": "2025-01-10T13:20:00Z"
+  },
+  {
+    "id": "msg-alpine-008",
+    "role": "assistant",
+    "markdown": "**Porównanie budżetowe (7 dni dla 3 osób):**\n\n**Szwajcaria (Interlaken + Grindelwald):**\n- Noclegi (hostel/boutique mix): ~1200-1800 CHF (~5500-8200 PLN)\n- Jedzenie: ~700 CHF (~3200 PLN)\n- Aktywności + transport: ~600 CHF (~2700 PLN)\n- **RAZEM: ~2500 CHF (~11,400 PLN) ≈ 3800 PLN/os.**\n\n**Włochy (Dolomity - Cortina d'Ampezzo):**\n- Noclegi (mix): ~900-1400 EUR (~3900-6000 PLN)\n- Jedzenie: ~500 EUR (~2150 PLN)\n- Aktywności + transport: ~400 EUR (~1700 PLN)\n- **RAZEM: ~1800 EUR (~7750 PLN) ≈ 2600 PLN/os.**\n\n💡 **Dolomity ~30% tańsze**, lepsze jedzenie, równie piękne! 🇮🇹",
+    "createdAt": "2025-01-10T14:00:00Z"
+  },
+  {
+    "id": "msg-alpine-009",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Dolomity + włoskie wino + architektura = DEAL! 🍷 Głosuję za Włochami! A są tam jakieś fajne via ferraty dla Anny?",
+    "createdAt": "2025-01-10T15:30:00Z"
+  },
+  {
+    "id": "msg-alpine-010",
+    "role": "assistant",
+    "markdown": "**Via ferraty w Dolomitach - TOP wybór dla Anny! 🧗‍♀️**\n\n1. **Via Ferrata delle Trincee** (Lagazuoi) - historyczna, I wojny światowej\n2. **Via Ferrata Ivano Dibona** (Cristallo) - spektakularne widoki\n3. **Via Ferrata Ra Gusela** (Nuvolau) - średni poziom, idealna na start\n\n**Dla Tomasza i Marii:**\n- Kolejka linowa na **Cinque Torri** - zero wysiłku, max widoki 🚡\n- Spacer wokół **Lago di Braies** - najpiękniejsze jezioro w Alpach\n- **Cortina d'Ampezzo** - eleganckie miasteczko z boutiques i restauracjami\n\nGotowi na rezerwację? 😊",
+    "createdAt": "2025-01-10T16:00:00Z"
+  },
+  {
+    "id": "msg-alpine-011",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "OMG via ferraty z I wojny światowej!? 🤯 MUSZĘ tam być! Rezerwujemy! 💪",
+    "createdAt": "2025-01-11T08:00:00Z"
+  },
+  {
+    "id": "msg-alpine-012",
+    "role": "user",
+    "userName": "Tomasz Nowak",
+    "markdown": "Lago di Braies wygląda jak z bajki 😍 Okay, jestem na tak!",
+    "createdAt": "2025-01-11T09:30:00Z"
+  },
+  {
+    "id": "msg-alpine-013",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Perfect! A jakie są opcje noclegów? Ja bym chciała coś z lokalnym klimatem 🏡",
+    "createdAt": "2025-01-11T10:15:00Z"
+  },
+  {
+    "id": "msg-alpine-014",
+    "role": "assistant",
+    "markdown": "**Opcje noclegowe w Cortina d'Ampezzo:**\n\n**Budget-friendly (dla Anny):**\n- **Hostel Olympia** - 35-45 EUR/noc, blisko centrum, socjalizacja ✅\n\n**Boutique (dla Marii):**\n- **Hotel Villa Alpina** - 90-120 EUR/noc, drewniany chalet, lokalna kuchnia 🏔️\n- **B&B Dolomiti** - 70-90 EUR/noc, rodzinny, śniadanie included\n\n**Komfort (dla Tomasza):**\n- **Hotel de la Poste** - 150-200 EUR/noc, spa, fine dining 🍽️\n\n💡 **Kompromis:** B&B Dolomiti - wszyscy w jednym miejscu, średnia cena, lokalny klimat!\n\nCzy rezerwuję 7 nocy w B&B Dolomiti? 😊",
+    "createdAt": "2025-01-11T11:00:00Z"
+  },
+  {
+    "id": "msg-alpine-015",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "B&B sounds good! Zgoda 👍",
+    "createdAt": "2025-01-11T12:00:00Z"
+  },
+  {
+    "id": "msg-alpine-016",
+    "role": "user",
+    "userName": "Tomasz Nowak",
+    "markdown": "Jeśli mają dobre śniadania, jestem za! ✅",
+    "createdAt": "2025-01-11T13:00:00Z"
+  },
+  {
+    "id": "msg-alpine-017",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Idealnie! A kiedy lecimy? Czerwiec? Lipiec? 📅",
+    "createdAt": "2025-01-12T09:00:00Z"
+  },
+  {
+    "id": "msg-alpine-018",
+    "role": "assistant",
+    "markdown": "**Najlepsze terminy dla Dolomitów (aktywności letnie):**\n\n**Czerwiec (wczesne lato):**\n✅ Mniej turystów, niższe ceny\n✅ Via ferraty już otwarte\n⚠️ Możliwe opady śniegu na wysokich szczytach\n🌡️ Temp: 15-22°C\n\n**Lipiec-Sierpień (peak season):**\n✅ Najlepsza pogoda, wszystko otwarte\n✅ Najdłuższe dni (więcej czasu na aktywności)\n❌ Tłumy, wyższe ceny (+30-40%)\n🌡️ Temp: 20-28°C\n\n**Wrzesień (early fall):**\n✅ Mniej ludzi, piękne kolory\n✅ Wciąż ciepło, stabilna pogoda\n⚠️ Niektóre rifugio mogą być zamknięte\n🌡️ Temp: 15-23°C\n\n💡 **Rekomendacja:** Koniec czerwca (25-30.06) - kompromis między pogodą a cenami! 🎯",
+    "createdAt": "2025-01-12T10:00:00Z"
+  },
+  {
+    "id": "msg-alpine-019",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Koniec czerwca idealny! Mam wtedy urlop 🌞",
+    "createdAt": "2025-01-12T11:00:00Z"
+  },
+  {
+    "id": "msg-alpine-020",
+    "role": "user",
+    "userName": "Tomasz Nowak",
+    "markdown": "U mnie też pasuje. Mniej turystów = mniej kolejek do kolejki 😂",
+    "createdAt": "2025-01-12T12:30:00Z"
+  },
+  {
+    "id": "msg-alpine-021",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Perfect! Kompromis? Gondola rano, a potem kto chce może iść na via ferrata? 😊",
+    "createdAt": "2025-01-22T16:45:00Z"
+  }
+]

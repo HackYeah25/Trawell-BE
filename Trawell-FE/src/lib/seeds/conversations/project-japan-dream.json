@@ -1,0 +1,89 @@
+[
+  {
+    "id": "msg-japan-001",
+    "role": "assistant",
+    "markdown": "Witajcie w projekcie **Japan Dream Trip**! 🇯🇵\n\nWidzę, że **Anna** i **Maria** macie wspólne zainteresowania:\n- Kultura i architektura\n- Lokalne jedzenie\n- Mix aktywności i relaksu\n\nCzy marzycie o Tokio? Kioto? Może coś bardziej niszowego jak Takayama? 😊",
+    "createdAt": "2024-12-05T10:35:00Z"
+  },
+  {
+    "id": "msg-japan-002",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Tokio + Kioto to MUST! 🏯 Plus chciałabym zobaczyć tradycyjne ryokany i onsen. A Ty, Anna?",
+    "createdAt": "2024-12-05T11:00:00Z"
+  },
+  {
+    "id": "msg-japan-003",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Zgadzam się! Ale dodałabym też **Mount Fuji** - może trekking albo przynajmniej widok z kawiarni? ⛰️ I ramen tour w Tokio! 🍜",
+    "createdAt": "2024-12-05T12:30:00Z"
+  },
+  {
+    "id": "msg-japan-004",
+    "role": "assistant",
+    "markdown": "**Propozycja trasy (14 dni):**\n\n🗼 **Tokio (5 dni):**\n- Nowoczesna część: Shibuya, Harajuku, Akihabara\n- Tradycyjna: Sensō-ji, Meiji Shrine\n- Ramen tour + Tsukiji Market 🍣\n\n⛩️ **Kioto (4 dni):**\n- Fushimi Inari, Kinkaku-ji (złota świątynia)\n- Arashiyama bamboo forest\n- Gion district (gejsze!)\n\n🗻 **Hakone (2 dni):**\n- Widoki na Mt. Fuji\n- Onsen experience\n- Lake Ashi cruise\n\n🏔️ **Takayama (3 dni):**\n- Tradycyjne miasteczko w Alpach Japońskich\n- Hiking dla Anny!\n- Lokalne sake brewery\n\n**Budżet:** Średni (~12,000-15,000 PLN/os. all-in)\n\nCo myślicie? 😊",
+    "createdAt": "2024-12-05T13:00:00Z"
+  },
+  {
+    "id": "msg-japan-005",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "WOW, Takayama sounds amazing! 😍 Nie znałam tego miejsca. Budżet ok, jestem za!",
+    "createdAt": "2024-12-05T14:00:00Z"
+  },
+  {
+    "id": "msg-japan-006",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Alpy Japońskie!? SOLD! 🏔️ A jest opcja trekkingu w Takayama?",
+    "createdAt": "2024-12-05T15:30:00Z"
+  },
+  {
+    "id": "msg-japan-007",
+    "role": "assistant",
+    "markdown": "**Trekking w rejonie Takayama - TOP opcje dla Anny! 🥾**\n\n1. **Kamikōchi Valley Trail** (łatwy-średni, 6-8h)\n   - Alpejskie doliny, krystaliczne rzeki\n   - Widoki na Hotaka Mountains (3190m)\n   - Best: czerwiec-październik\n\n2. **Mount Norikura** (średni, 4-6h)\n   - Bus do 2700m, trekking do 3026m\n   - Panoramy 360°\n   - Lakeside onsen po zejściu! ♨️\n\n3. **Shirakawa-go day hike** (łatwy, 3-4h)\n   - UNESCO village z tradycyjnymi gassho-zukuri domami\n   - Łąki i ryżowe tarasy\n   - Kulturowo + przyrodniczo dla Marii!\n\n**Dla Marii:**\n- Spacer po historycznym centrum Takayama\n- Morning market z lokalnym craft\n- Sake tasting w Funasaka Sake Brewery 🍶\n\nPasuje? 😊",
+    "createdAt": "2024-12-05T16:00:00Z"
+  },
+  {
+    "id": "msg-japan-008",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Kamikōchi Valley = mój sen! 🤩 I onsen po trekkingu brzmi idealnie!",
+    "createdAt": "2024-12-06T09:00:00Z"
+  },
+  {
+    "id": "msg-japan-009",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Shirakawa-go też chcę zobaczyć! A sake tasting must 😋 Czy mogę do Tokio trip dodać teraz?",
+    "createdAt": "2024-12-10T10:00:00Z"
+  },
+  {
+    "id": "msg-japan-010",
+    "role": "assistant",
+    "markdown": "Oczywiście! Tworzę dla Was **Trip: Tokio** 🗼\n\nZaczniemy od 5-dniowego planu z sugestiami atrakcji. Gotowe za moment! ✨",
+    "createdAt": "2024-12-10T10:05:00Z"
+  },
+  {
+    "id": "msg-japan-011",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Super! A ja później chcę stworzyć trip do Kioto 🏯",
+    "createdAt": "2024-12-10T11:00:00Z"
+  },
+  {
+    "id": "msg-japan-012",
+    "role": "user",
+    "userName": "Maria Wiśniewska",
+    "markdown": "Perfect! Razem je dopracujemy 😊",
+    "createdAt": "2024-12-10T12:00:00Z"
+  },
+  {
+    "id": "msg-japan-013",
+    "role": "user",
+    "userName": "Anna Kowalska",
+    "markdown": "Zaakceptowałam Senso-ji Temple! 🏯",
+    "createdAt": "2025-01-21T11:20:00Z"
+  }
+]

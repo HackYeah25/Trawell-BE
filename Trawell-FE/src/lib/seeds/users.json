@@ -1,0 +1,285 @@
+[
+  {
+    "id": "user-anna-001",
+    "name": "Anna Kowalska",
+    "email": "anna@example.com",
+    "onboardingCompleted": true,
+    "profile": {
+      "id": "user-anna-001",
+      "name": "Anna Kowalska",
+      "onboardingCompleted": true,
+      "completeness": 0.95,
+      "preferences": {
+        "traveler_type": "explorer",
+        "activity_level": "high",
+        "accommodation_style": "hostel",
+        "environment": "mountains",
+        "budget_sensitivity": "medium",
+        "culture_interest": "high",
+        "food_importance": "medium"
+      },
+      "constraints": {
+        "dietary_restrictions": ["vegetarian"],
+        "mobility_limitations": [],
+        "climate_preferences": ["cool_cold", "mild_temperate"],
+        "language_preferences": ["English proficient"]
+      },
+      "experience": {
+        "past_destinations": [
+          { "name": "Nepal, Himalayas", "highlight": "Trekking to Everest Base Camp" },
+          { "name": "Patagonia, Argentina", "highlight": "Glaciers and wild nature" },
+          { "name": "Iceland", "highlight": "Northern lights and geysers" }
+        ],
+        "wishlist_regions": ["New Zealand", "Norway", "Alaska"]
+      },
+      "insights": {
+        "personaLabel": "Adrenaline Explorer - Mountain Enthusiast",
+        "summaryMarkdown": "You love **intensive** mountain expeditions with trekking and outdoor activities. You prefer **hostels and mountain huts** where you can meet other travelers. Medium budget, but **experiences** are the priority.",
+        "topTags": ["mountains", "trekking", "explorer", "adventure", "vegetarian"]
+      },
+      "updatedAt": "2025-01-15T10:30:00Z"
+    }
+  },
+  {
+    "id": "user-tomasz-002",
+    "name": "Tomasz Nowak",
+    "email": "tomasz@example.com",
+    "onboardingCompleted": true,
+    "profile": {
+      "id": "user-tomasz-002",
+      "name": "Tomasz Nowak",
+      "onboardingCompleted": true,
+      "completeness": 0.88,
+      "preferences": {
+        "traveler_type": "relaxer",
+        "activity_level": "low",
+        "accommodation_style": "all_inclusive",
+        "environment": "beach",
+        "budget_sensitivity": "low",
+        "culture_interest": "low",
+        "food_importance": "high"
+      },
+      "constraints": {
+        "dietary_restrictions": [],
+        "mobility_limitations": ["Prefers avoiding long walks"],
+        "climate_preferences": ["hot_tropical"],
+        "language_preferences": ["Prefers Polish-speaking guides"]
+      },
+      "experience": {
+        "past_destinations": [
+          { "name": "Maldives", "highlight": "Relaxing in overwater bungalow" },
+          { "name": "Zanzibar, Tanzania", "highlight": "Beaches and seafood" },
+          { "name": "Bali, Indonesia", "highlight": "Spa and Balinese massages" }
+        ],
+        "wishlist_regions": ["Caribbean", "Mauritius", "Thailand"]
+      },
+      "insights": {
+        "personaLabel": "Luxury Beach Relaxer - Peace Connoisseur",
+        "summaryMarkdown": "You love **peaceful relaxation** on the beach with all-inclusive. Food and comfort are most important. You prefer **tropical climate** and minimal effort sightseeing.",
+        "topTags": ["beach", "luxury", "all-inclusive", "foodie", "spa"]
+      },
+      "updatedAt": "2025-01-18T14:20:00Z"
+    }
+  },
+  {
+    "id": "user-maria-003",
+    "name": "Maria Wiśniewska",
+    "email": "maria@example.com",
+    "onboardingCompleted": true,
+    "profile": {
+      "id": "user-maria-003",
+      "name": "Maria Wiśniewska",
+      "onboardingCompleted": true,
+      "completeness": 0.92,
+      "preferences": {
+        "traveler_type": "mixed",
+        "activity_level": "medium",
+        "accommodation_style": "boutique",
+        "environment": "city",
+        "budget_sensitivity": "medium",
+        "culture_interest": "high",
+        "food_importance": "high"
+      },
+      "constraints": {
+        "dietary_restrictions": ["gluten-free"],
+        "mobility_limitations": [],
+        "climate_preferences": ["mild_temperate"],
+        "language_preferences": ["Multilingual friendly"]
+      },
+      "experience": {
+        "past_destinations": [
+          { "name": "Lisbon, Portugal", "highlight": "Pastel de nata and trams" },
+          { "name": "Barcelona, Spain", "highlight": "Gaudí and tapas" },
+          { "name": "Budapest, Hungary", "highlight": "Thermal baths and ruin bars" }
+        ],
+        "wishlist_regions": ["Japan", "Portugal (Porto)", "Greece"]
+      },
+      "insights": {
+        "personaLabel": "Urban Culture Enthusiast - City Aesthete",
+        "summaryMarkdown": "Mix of **culture and relaxation** in European cities. You love **boutique hotels**, local cuisine, and architecture. Medium-intensity sightseeing with breaks for coffee and food.",
+        "topTags": ["city", "culture", "architecture", "foodie", "boutique"]
+      },
+      "updatedAt": "2025-01-20T09:15:00Z"
+    }
+  },
+  {
+    "id": "user-anna",
+    "name": "Ania",
+    "email": "ania@iguana.com",
+    "onboardingCompleted": true,
+    "profile": {
+      "id": "user-anna",
+      "name": "Ania",
+      "onboardingCompleted": true,
+      "completeness": 0.90,
+      "preferences": {
+        "traveler_type": "mixed",
+        "activity_level": "medium",
+        "accommodation_style": "boutique",
+        "environment": "city",
+        "budget_sensitivity": "medium",
+        "culture_interest": "high",
+        "food_importance": "high"
+      },
+      "constraints": {
+        "dietary_restrictions": [],
+        "mobility_limitations": [],
+        "climate_preferences": ["mild_temperate"],
+        "language_preferences": ["Polish", "English"]
+      },
+      "experience": {
+        "past_destinations": [
+          { "name": "Prague", "highlight": "Historic architecture" },
+          { "name": "Vienna", "highlight": "Coffee culture and museums" }
+        ],
+        "wishlist_regions": ["Krakow", "Budapest", "Lviv"]
+      },
+      "insights": {
+        "personaLabel": "Organized Coordinator",
+        "summaryMarkdown": "You love coordinating group trips and creating detailed plans.",
+        "topTags": ["organizer", "culture", "city", "foodie"]
+      },
+      "updatedAt": "2025-01-10T10:00:00Z"
+    }
+  },
+  {
+    "id": "user-kasia",
+    "name": "Kasia",
+    "email": "kasia@iguana.com",
+    "onboardingCompleted": true,
+    "profile": {
+      "id": "user-kasia",
+      "name": "Kasia",
+      "onboardingCompleted": true,
+      "completeness": 0.85,
+      "preferences": {
+        "traveler_type": "relaxer",
+        "activity_level": "low",
+        "accommodation_style": "boutique",
+        "environment": "city",
+        "budget_sensitivity": "medium",
+        "culture_interest": "medium",
+        "food_importance": "very_high"
+      },
+      "constraints": {
+        "dietary_restrictions": [],
+        "mobility_limitations": [],
+        "climate_preferences": ["mild_temperate", "cool_cold"],
+        "language_preferences": ["Polish"]
+      },
+      "experience": {
+        "past_destinations": [
+          { "name": "Paris", "highlight": "Croissants and bistros" },
+          { "name": "Bologna", "highlight": "Pasta making class" }
+        ],
+        "wishlist_regions": ["Lyon", "San Sebastian", "Krakow"]
+      },
+      "insights": {
+        "personaLabel": "Foodie Explorer",
+        "summaryMarkdown": "Your trips revolve around discovering local cuisine and food culture.",
+        "topTags": ["foodie", "gastronomy", "markets", "traditional cuisine"]
+      },
+      "updatedAt": "2025-01-10T10:00:00Z"
+    }
+  },
+  {
+    "id": "user-marek",
+    "name": "Marek",
+    "email": "marek@iguana.com",
+    "onboardingCompleted": true,
+    "profile": {
+      "id": "user-marek",
+      "name": "Marek",
+      "onboardingCompleted": true,
+      "completeness": 0.88,
+      "preferences": {
+        "traveler_type": "explorer",
+        "activity_level": "medium",
+        "accommodation_style": "standard",
+        "environment": "city",
+        "budget_sensitivity": "high",
+        "culture_interest": "very_high",
+        "food_importance": "low"
+      },
+      "constraints": {
+        "dietary_restrictions": [],
+        "mobility_limitations": [],
+        "climate_preferences": ["cool_cold", "mild_temperate"],
+        "language_preferences": ["Polish", "English"]
+      },
+      "experience": {
+        "past_destinations": [
+          { "name": "Rome", "highlight": "Ancient ruins and history" },
+          { "name": "Athens", "highlight": "Acropolis and museums" }
+        ],
+        "wishlist_regions": ["Jerusalem", "Istanbul", "Krakow"]
+      },
+      "insights": {
+        "personaLabel": "History Buff",
+        "summaryMarkdown": "You're passionate about historical sites and learning about past civilizations.",
+        "topTags": ["history", "museums", "architecture", "culture", "budget-conscious"]
+      },
+      "updatedAt": "2025-01-10T10:00:00Z"
+    }
+  },
+  {
+    "id": "user-tomek",
+    "name": "Tomek",
+    "email": "tomek@iguana.com",
+    "onboardingCompleted": true,
+    "profile": {
+      "id": "user-tomek",
+      "name": "Tomek",
+      "onboardingCompleted": true,
+      "completeness": 0.92,
+      "preferences": {
+        "traveler_type": "explorer",
+        "activity_level": "high",
+        "accommodation_style": "standard",
+        "environment": "mixed",
+        "budget_sensitivity": "medium",
+        "culture_interest": "medium",
+        "food_importance": "medium"
+      },
+      "constraints": {
+        "dietary_restrictions": [],
+        "mobility_limitations": [],
+        "climate_preferences": ["mild_temperate", "cool_cold"],
+        "language_preferences": ["Polish", "English"]
+      },
+      "experience": {
+        "past_destinations": [
+          { "name": "Iceland", "highlight": "Northern lights photography" },
+          { "name": "Scotland", "highlight": "Highland landscapes" }
+        ],
+        "wishlist_regions": ["Norway", "New Zealand", "Patagonia"]
+      },
+      "insights": {
+        "personaLabel": "Visual Explorer - Photographer",
+        "summaryMarkdown": "You travel with a camera, always looking for the perfect shot and unique perspectives.",
+        "topTags": ["photography", "landscapes", "golden hour", "street photography"]
+      },
+      "updatedAt": "2025-01-10T10:00:00Z"
+    }
+  }
+]
