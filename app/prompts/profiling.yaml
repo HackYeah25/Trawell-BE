@@ -6,430 +6,156 @@ system_prompt: |
 
   IMPORTANT RULES:
   1. Ask questions naturally and conversationally
-  2. Validate each answer against the minimum required information
-  3. If an answer is too vague, ask follow-up questions
-  4. Provide suggestions and examples to help users who are unsure
-  5. Never move to the next question until you have sufficient information
-  6. Keep track of the profiling progress
-  7. Be encouraging and friendly throughout
+  2. Accept answers that provide reasonable insight - don't be overly strict
+  3. Only ask follow-up questions if the answer is truly unclear or missing key information
+  4. Trust the user's responses - if they give you something, work with it
+  5. Move forward confidently when you have enough to make recommendations
+  6. Keep the conversation flowing and friendly
+  7. Prioritize user experience over perfect data
 
 intro_message: |
   Welcome! 👋 I'm excited to help you discover amazing travel destinations.
 
   To give you the best personalized recommendations, I'd love to get to know your travel style.
-  This will be a casual conversation - just answer naturally, and I'll guide you through it.
+  This will be a quick conversation - just 4 simple questions!
 
   Ready to start?
 
 questions:
-  - id: "traveler_type"
+  - id: "traveler_style"
     order: 1
     category: "core_preferences"
     question: |
-      Let's start with the basics - what kind of traveler are you?
+      Let's start with the basics - how would you describe your ideal travel pace and energy?
 
-      🏃 Do you prefer actively exploring new places and having adventures?
-      🧘 Or do you lean more towards relaxing and unwinding?
-      🔀 Or maybe a mix of both?
-
-    context: |
-      Understanding if the user is an explorer, relaxer, or mixed traveler helps us
-      recommend appropriate destinations and activities.
-
-    validation:
-      min_tokens: 5
-      required_info:
-        - "Activity preference indicator (active/relaxed/mixed)"
-
-      examples_if_unclear:
-        - "For example, do you prefer hiking and city tours, or lounging by the pool?"
-        - "Think about your last vacation - were you out exploring most days, or taking it easy?"
-
-      follow_up_questions:
-        - condition: "vague"
-          question: "Can you tell me more? Do you usually book lots of activities or prefer to go with the flow?"
-        - condition: "contradictory"
-          question: "I noticed you mentioned both active and relaxed - would you say you like to balance both, or does it depend on the trip?"
-
-    extracts_to:
-      field: "preferences.traveler_type"
-      type: "enum"
-      values: ["explorer", "relaxer", "mixed"]
-
-  - id: "activity_level"
-    order: 2
-    category: "core_preferences"
-    question: |
-      Great! Now, how active do you like your trips to be?
-
-      Are you into:
-      - 🥾 High activity (hiking, long walks, multiple activities per day)
-      - 🚶 Medium activity (some walking tours, balanced schedule)
-      - 🛋️ Low activity (leisurely pace, shorter excursions)
+      🏃 High-energy explorer (multiple activities daily, always on the move, hiking and adventures)
+      🚶 Moderate explorer (balanced mix of activities and downtime, some walking tours)
+      🧘 Relaxed explorer (leisurely exploration, shorter excursions, plenty of rest)
+      🛋️ Pure relaxation (minimal activities, focused on unwinding and taking it easy)
 
     context: |
-      Activity level helps us understand physical intensity and daily schedule preferences.
+      Understanding the user's travel pace and energy level helps us recommend appropriate 
+      destinations, activities, and daily schedules that match their style.
 
     validation:
-      min_tokens: 3
-      required_info:
-        - "Clear indication of preferred activity intensity"
+      accept_if:
+        - "Any indication of energy level or pace preference"
+        - "Choosing one of the provided options"
+        - "Describing their typical travel day in any reasonable detail"
 
-      examples_if_unclear:
-        - "For instance, would you rather do a 6-hour mountain hike or a 1-hour scenic walk?"
-        - "Do you typically book tours that last all day, or prefer shorter 2-3 hour activities?"
+      only_follow_up_if:
+        - "Response is a single word with no context (e.g., just 'yes' or 'maybe')"
+        - "Response is completely off-topic"
 
-      follow_up_questions:
-        - condition: "vague"
-          question: "To help me understand better - how many hours per day would you ideally spend on activities vs. resting?"
-
-    extracts_to:
-      field: "preferences.activity_level"
-      type: "enum"
-      values: ["low", "medium", "high"]
-
-  - id: "accommodation"
-    order: 3
-    category: "core_preferences"
-    question: |
-      Where do you like to stay when traveling?
-
-      - 🏨 All-inclusive resorts (everything handled, relaxing)
-      - 🏛️ Boutique hotels (unique, character-filled)
-      - 🏕️ Hostels or budget-friendly options (social, economical)
-      - 🔀 Flexible (depends on the destination)
-
-    context: |
-      Accommodation style reveals budget considerations and travel personality.
-
-    validation:
-      min_tokens: 4
-      required_info:
-        - "Accommodation type preference"
-
-      examples_if_unclear:
-        - "Think about your favorite stays - what made them great?"
-
-      follow_up_questions:
-        - condition: "budget_mentioned"
-          question: "Got it - so budget is a consideration. Would you say it's your main factor, or are you flexible for the right experience?"
+      examples_if_truly_unclear:
+        - "For example, would you rather pack your days with activities or have plenty of downtime?"
 
     extracts_to:
-      field: "preferences.accommodation_style"
-      type: "enum"
-      values: ["all_inclusive", "boutique", "hostel", "mixed"]
+      field: "preferences.traveler_style"
+      type: "object"
+      sub_fields:
+        - "energy_level: enum(high, moderate, low)"
+        - "pace: enum(fast, balanced, leisurely)"
 
   - id: "environment"
-    order: 4
+    order: 2
     category: "core_preferences"
     question: |
       What environments call to you the most?
 
-      - 🏙️ Cities (urban exploration, culture, nightlife)
-      - 🌲 Nature (forests, wilderness, natural parks)
-      - 🏖️ Beaches (ocean, sun, water activities)
-      - ⛰️ Mountains (altitude, fresh air, hiking)
-      - 🌍 Mixed (I enjoy variety!)
+      🏙️ Cities • 🌲 Nature • 🏖️ Beaches • ⛰️ Mountains • 🌍 Mixed
 
     context: |
       Environment preference is crucial for destination matching.
 
     validation:
-      min_tokens: 5
-      required_info:
-        - "At least one environment type"
-        - "Relative preference if multiple mentioned"
+      accept_if:
+        - "Mentions at least one environment type"
+        - "Any clear preference indication"
 
-      examples_if_unclear:
-        - "Where do you feel most at peace - in a bustling city, by the ocean, or in the mountains?"
-
-      follow_up_questions:
-        - condition: "multiple_environments"
-          question: "You mentioned several - if you had to pick your top choice, which environment would it be?"
+      only_follow_up_if:
+        - "Response doesn't mention any environment at all"
 
     extracts_to:
       field: "preferences.environment"
       type: "enum"
       values: ["city", "nature", "beach", "mountains", "mixed"]
 
-  - id: "budget_sensitivity"
-    order: 5
-    category: "core_preferences"
-    question: |
-      How important is budget when choosing a destination?
-
-      - 💰 Very important (I'm cost-conscious and look for deals)
-      - 💵 Somewhat important (I balance cost with experience)
-      - 💳 Not a major concern (I prioritize experience over cost)
-
-    context: |
-      Budget sensitivity helps us filter destinations appropriately.
-
-    validation:
-      min_tokens: 4
-      required_info:
-        - "Budget priority level"
-
-      examples_if_unclear:
-        - "For example, would you skip a destination if it's expensive, or would you find budget ways to visit?"
-
-      follow_up_questions:
-        - condition: "vague"
-          question: "To clarify - would a $2000 vs $4000 trip make a significant difference in your decision?"
-
-    extracts_to:
-      field: "preferences.budget_sensitivity"
-      type: "enum"
-      values: ["low", "medium", "high"]
-
-  - id: "culture_interest"
-    order: 6
-    category: "core_preferences"
-    question: |
-      How interested are you in cultural experiences?
-
-      Think: museums, historical sites, local traditions, art galleries
-
-      - 🎭 Very interested (this is a highlight of travel for me)
-      - 🎨 Moderately interested (I enjoy some cultural activities)
-      - 🤷 Not particularly interested (I prefer other experiences)
-
-    context: |
-      Culture interest affects activity and destination recommendations.
-
-    validation:
-      min_tokens: 4
-      required_info:
-        - "Interest level in cultural activities"
-
-      examples_if_unclear:
-        - "Would you visit every museum in a city, a few key ones, or skip them entirely?"
-
-    extracts_to:
-      field: "preferences.culture_interest"
-      type: "enum"
-      values: ["low", "medium", "high"]
-
-  - id: "food_importance"
-    order: 7
-    category: "core_preferences"
-    question: |
-      How important is food to your travel experience?
-
-      - 🍜 Extremely important (trying local cuisine is a highlight!)
-      - 🍽️ Moderately important (I enjoy good food but it's not the main focus)
-      - 🥪 Just a necessity (I eat to fuel my adventures)
-
-    context: |
-      Food importance helps prioritize culinary experiences in recommendations.
-
-    validation:
-      min_tokens: 4
-      required_info:
-        - "Food priority level"
-
-      examples_if_unclear:
-        - "Do you plan trips around food experiences, or is food just part of the journey?"
-
-    extracts_to:
-      field: "preferences.food_importance"
-      type: "enum"
-      values: ["low", "medium", "high"]
-
-  - id: "dietary_restrictions"
-    order: 8
-    category: "constraints"
-    question: |
-      Do you have any dietary restrictions or preferences I should know about?
-
-      For example: vegetarian, vegan, halal, kosher, allergies, etc.
-
-      (If none, just say "no" or "none")
-
-    context: |
-      Dietary restrictions are critical constraints for destination and restaurant recommendations.
-
-    validation:
-      min_tokens: 1
-      required_info:
-        - "Clear yes/no on dietary restrictions"
-        - "Specific restrictions if yes"
-
-      follow_up_questions:
-        - condition: "yes_but_no_details"
-          question: "Could you specify what dietary restrictions you have?"
-
-    extracts_to:
-      field: "constraints.dietary_restrictions"
-      type: "array"
-      default: []
-
-  - id: "mobility_accessibility"
-    order: 9
-    category: "constraints"
-    question: |
-      Do you have any mobility limitations or accessibility needs?
-
-      This helps me recommend destinations with appropriate facilities.
-
-      (If none, just say "no" or "none")
-
-    context: |
-      Mobility and accessibility needs are important for practical recommendations.
-
-    validation:
-      min_tokens: 1
-      required_info:
-        - "Clear indication of accessibility needs"
-
-      follow_up_questions:
-        - condition: "yes_but_vague"
-          question: "Could you tell me more about what accommodations would make your trip more comfortable?"
-
-    extracts_to:
-      field: "constraints.mobility_limitations"
-      type: "array"
-      default: []
-
-  - id: "climate_preference"
-    order: 10
-    category: "constraints"
-    question: |
-      What climates do you enjoy most?
-
-      - ☀️ Hot and tropical (beach weather, 25-35°C)
-      - 🌤️ Mild and temperate (spring/fall weather, 15-25°C)
-      - ❄️ Cool or cold (mountain air, below 15°C)
-      - 🌡️ No strong preference
-
-    context: |
-      Climate preference helps filter destinations by weather and season.
-
-    validation:
-      min_tokens: 3
-      required_info:
-        - "At least one climate preference"
-
-      examples_if_unclear:
-        - "Think about when you feel most comfortable - in hot summer, mild spring, or cool winter?"
-
-    extracts_to:
-      field: "constraints.climate_preferences"
-      type: "array"
-      values: ["hot_tropical", "mild_temperate", "cool_cold", "no_preference"]
-
   - id: "past_destinations"
-    order: 11
+    order: 3
     category: "experience"
     question: |
-      Tell me about some of your favorite past trips!
+      Tell me about some of your favorite past trips - where you went and what made them special?
 
-      Where have you been that you really loved? What made those places special?
-
-      (If you haven't traveled much yet, that's totally fine - just let me know!)
+      (If you haven't traveled much, just let me know!)
 
     context: |
       Past destinations reveal patterns and help avoid repetition or find similar experiences.
 
     validation:
-      min_tokens: 5
-      required_info:
-        - "At least mention if traveled or not"
-        - "If traveled, at least one destination with brief reason why it was good"
+      accept_if:
+        - "Mentions any destination (even just one)"
+        - "Indicates they haven't traveled much"
+        - "Any response that gives insight into travel history"
 
-      examples_if_unclear:
-        - "Even a weekend trip counts! What's a place you'd visit again?"
-
-      follow_up_questions:
-        - condition: "only_list_no_reasons"
-          question: "Great list! What did you love most about [first destination mentioned]?"
+      only_follow_up_if:
+        - "Response is unclear about whether they've traveled or not"
 
     extracts_to:
       field: "past_destinations"
       type: "array"
       context_field: "past_trip_insights"
 
-  - id: "wishlist_regions"
-    order: 12
-    category: "experience"
-    question: |
-      Are there any regions or types of destinations on your wishlist?
-
-      Places you've always dreamed of visiting, or types of experiences you want to have?
-
-    context: |
-      Wishlist helps prioritize recommendations toward user's dream destinations.
-
-    validation:
-      min_tokens: 3
-      required_info:
-        - "At least one wishlist item or indication of no specific wishlist"
-
-      examples_if_unclear:
-        - "For example: 'I've always wanted to see Southeast Asia' or 'I'd love to experience a safari'"
-
-    extracts_to:
-      field: "wishlist_regions"
-      type: "array"
-      default: []
-
-  - id: "language_comfort"
-    order: 13
+  - id: "anything_else"
+    order: 4
     category: "constraints"
     question: |
-      Last question! Do you have any language preferences or comfort levels?
+      Last one! Anything else I should know? (dietary needs, accessibility, language preferences, etc.)
 
-      - Do you prefer destinations where English is common?
-      - Are you comfortable with language barriers?
-      - Do you speak other languages?
+      Or we can skip this if nothing comes to mind!
 
     context: |
-      Language comfort helps recommend destinations with appropriate communication ease.
+      This open-ended question captures important constraints and preferences that might 
+      not fit into structured categories, allowing users to share what matters most to them.
 
     validation:
-      min_tokens: 4
-      required_info:
-        - "Language comfort level"
-
-      examples_if_unclear:
-        - "Would you be comfortable traveling somewhere where very few people speak English?"
+      accept_if:
+        - "Any response, including 'no', 'nothing', 'nope', etc."
+        - "This question should NEVER require follow-up"
 
     extracts_to:
-      field: "constraints.language_preferences"
-      type: "array"
-      default: []
+      field: "additional_constraints"
+      type: "object"
+      sub_fields:
+        - "dietary_restrictions: array"
+        - "mobility_limitations: array"
+        - "language_preferences: array"
+        - "other_notes: string"
 
 completion_message: |
-  Fantastic! 🎉 I've got a comprehensive understanding of your travel style.
+  Perfect! 🎉 I've got what I need to help you find amazing destinations.
 
-  Your profile is complete and saved. I'll use all of this to give you personalized
-  destination recommendations that truly match what you're looking for.
-
-  Ready to start brainstorming your next adventure?
+  Let's start exploring options for your next adventure!
 
 validation_rules:
-  min_profile_completeness: 0.8  # 80% of questions must be sufficiently answered
+  philosophy: "Accept reasonable responses and move forward. User experience > perfect data."
+  
+  min_profile_completeness: 0.5  # Only 50% completeness required - very permissive
 
-  critical_questions:  # These MUST be answered to proceed
-    - "traveler_type"
-    - "activity_level"
+  critical_questions:  # Only these 2 MUST have some answer
+    - "traveler_style"
     - "environment"
-    - "budget_sensitivity"
 
-  max_follow_up_attempts: 3  # Maximum times to ask follow-up for same question
+  max_follow_up_attempts: 1  # Only ask for clarification ONCE, then move on
+
+  default_behavior: "When in doubt, accept the answer and proceed"
 
   insufficient_answer_prompts:
-    - "I'd love to know a bit more about that. Can you elaborate?"
-    - "That helps, but could you give me a few more details?"
-    - "Thanks! To make sure I understand correctly, could you expand on that?"
+    - "Just to make sure I understand - could you give me a quick example?"
 
 suggestion_prompts:
-  unsure_response: |
-    No worries if you're not sure! Here are some examples that might help:
-    {examples}
-
-  thinking_time: |
-    Take your time! There's no rush. Think about your ideal vacation...
-
   encouragement: |
-    You're doing great! This helps me understand you better.
+    Great! That helps a lot.
+
+  moving_forward: |
+    Perfect, moving on!
