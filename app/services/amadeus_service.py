@@ -178,9 +178,48 @@ class AmadeusService:
         if nonstop:
             params["nonStop"] = "true"
 
-        return await self._make_request(
+        result = await self._make_request(
             "GET", "/v2/shopping/flight-offers", params=params
         )
+
+        offers = result.get("data", []) or []
+        summary: List[Dict[str, Any]] = []
+        for offer in offers:
+            price_info = offer.get("price", {}) or {}
+            itineraries_out: List[Dict[str, Any]] = []
+            for itin in offer.get("itineraries", []) or []:
+                seg_out: List[Dict[str, Any]] = []
+                for seg in itin.get("segments", []) or []:
+                    dep = seg.get("departure", {}) or {}
+                    arr = seg.get("arrival", {}) or {}
+                    seg_out.append({
+                        "from": dep.get("iataCode"),
+                        "to": arr.get("iataCode"),
+                        "departureAt": dep.get("at"),
+                        "arrivalAt": arr.get("at"),
+                        "duration": seg.get("duration"),
+                    })
+                itineraries_out.append({
+                    "totalDuration": itin.get("duration"),
+                    "segments": seg_out,
+                })
+            summary.append({
+                "price": price_info.get("total"),
+                "currency": price_info.get("currency") or price_info.get("currencyCode"),
+                "itineraries": itineraries_out,
+            })
+
+        def _price_to_float(p):
+            try:
+                return float(p)
+            except Exception:
+                return float("inf")
+
+        summary_sorted = sorted(summary, key=lambda x: _price_to_float(x.get("price")))
+        result["summary"] = summary_sorted
+        if summary_sorted:
+            result["cheapest"] = summary_sorted[0]
+        return result
 
     async def get_flight_price(
         self, flight_offers: List[Dict[str, Any]]
@@ -295,6 +334,105 @@ class AmadeusService:
             },
         )
 
+    async def get_hotel_offers_for_city(
+        self,
+        city_code: str,
+        check_in_date: str,
+        check_out_date: str,
+        adults: int = 1,
+        room_quantity: int = 1,
+        radius: int = 5,
+        radius_unit: str = "KM",
+        max_hotels: int = 10,
+    ) -> Dict[str, Any]:
+        """Fetch hotels by city, then retrieve offers for those hotels and return a summary.
+
+        Summary format:
+        {
+          "count": number,
+          "results": [
+            { "hotelId": str, "name": str | None, "offers": [ { "price": str | None, "currency": str | None, "checkInDate": str | None, "checkOutDate": str | None } ] }
+          ]
+        }
+        """
+        hotels_resp = await self.search_hotels_by_city(
+            city_code=city_code, radius=radius, radius_unit=radius_unit
+        )
+
+        hotel_rows = hotels_resp.get("data", []) or []
+        hotel_ids: List[str] = []
+
+        for h in hotel_rows:
+            hid = h.get("hotelId") or (h.get("hotel", {}) or {}).get("hotelId")
+            if isinstance(hid, str):
+                hotel_ids.append(hid)
+
+        # Deduplicate and cap
+        seen = set()
+        unique_ids: List[str] = []
+        for hid in hotel_ids:
+            if hid not in seen:
+                seen.add(hid)
+                unique_ids.append(hid)
+            if len(unique_ids) >= max_hotels:
+                break
+
+        if not unique_ids:
+            return {"count": 0, "results": []}
+
+        offers_resp = await self.search_hotel_offers(
+            hotel_ids=unique_ids,
+            check_in_date=check_in_date,
+            check_out_date=check_out_date,
+            adults=adults,
+            room_quantity=room_quantity,
+        )
+
+        results = []
+        for item in offers_resp.get("data", []) or []:
+            hotel = item.get("hotel", {}) or {}
+            offers_list = item.get("offers", []) or []
+            simplified_offers = []
+            for off in offers_list:
+                price = (off.get("price", {}) or {}).get("total")
+                currency = (off.get("price", {}) or {}).get("currency")
+                simplified_offers.append({
+                    "price": price,
+                    "currency": currency,
+                    "checkInDate": off.get("checkInDate"),
+                    "checkOutDate": off.get("checkOutDate"),
+                })
+            # Sort offers for each hotel by cheapest first
+            def _offer_price_to_float(x):
+                try:
+                    return float(x.get("price")) if x.get("price") is not None else float("inf")
+                except Exception:
+                    return float("inf")
+
+            simplified_offers_sorted = sorted(simplified_offers, key=_offer_price_to_float)
+
+            results.append({
+                "hotelId": hotel.get("hotelId"),
+                "name": hotel.get("name"),
+                "offers": simplified_offers_sorted,
+                "cheapest": simplified_offers_sorted[0] if simplified_offers_sorted else None,
+            })
+
+        # Sort hotels by their cheapest offer price and expose overall cheapest
+        def _hotel_min_price(h):
+            ch = h.get("cheapest") or {}
+            try:
+                return float(ch.get("price")) if ch.get("price") is not None else float("inf")
+            except Exception:
+                return float("inf")
+
+        results_sorted = sorted(results, key=_hotel_min_price)
+        return {
+            "count": len(results_sorted),
+            "results": results_sorted,
+            "cheapest": results_sorted[0] if results_sorted else None,
+        }
+
     async def get_hotel_offer(self, offer_id: str) -> Dict[str, Any]:
         """
         Get detailed hotel offer by ID
@@ -384,3 +522,60 @@ class AmadeusService:
 
 # Global service instance
 amadeus_service = AmadeusService()
+
+
+if __name__ == "__main__":
+    import asyncio
+    import json
+
+    async def _test_search_flights():
+        """Basic manual test for search_flights()."""
+        try:
+            svc = AmadeusService()  # uses settings for credentials
+            dep_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+            result = await svc.search_flights(
+                origin="JFK",
+                destination="LAX",
+                departure_date=dep_date,
+                adults=1,
+                nonstop=True,
+                max_results=5,
+            )
+            print(json.dumps({
+                "cheapest": result.get("cheapest"),
+                "count": len(result.get("summary", [])),
+            }, indent=2))
+        except Exception as e:
+            print({
+                "status": "error",
+                "error": str(e),
+            })
+
+    async def _test_search_hotels_by_city():
+        """Basic manual test for fetching hotel offers by city."""
+        try:
+            svc = AmadeusService()  # uses settings for credentials
+            check_in = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+            check_out = (datetime.now() + timedelta(days=32)).strftime("%Y-%m-%d")
+            result = await svc.get_hotel_offers_for_city(
+                city_code="PAR",
+                check_in_date=check_in,
+                check_out_date=check_out,
+                adults=2,
+                room_quantity=1,
+                radius=3,
+                radius_unit="KM",
+                max_hotels=5,
+            )
+            print(json.dumps(result, indent=2))
+        except Exception as e:
+            print({
+                "status": "error",
+                "error": str(e),
+            })
+
+    async def _main():
+        await _test_search_flights()
+        await _test_search_hotels_by_city()
+
+    asyncio.run(_main())
