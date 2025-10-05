@@ -180,3 +180,23 @@ customize_itinerary: |
   - Realistic timing
   - Budget considerations
   - User's original preferences
+
+location_technical_details:
+  Provide technical details for {destination}:
+
+  Output in json format:
+
+    "weather": "Weather in {destination}",
+    "timezone": "Timezone in {destination}",
+    "currency": "Currency in {destination}",
+    "language": "Language in {destination}",
+    "climate": "Climate in {destination}",
+    "safety": "Safety in {destination}",
+
+  Include:
+  - Weather
+  - Timezone
+  - Currency
+  - Language
+  - Climate
+  - Safety

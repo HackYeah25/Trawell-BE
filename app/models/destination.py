@@ -14,6 +14,7 @@ class RecommendationStatus(str, Enum):
     DETAILS_COMPLETED = "details_completed"
 
 class Rating(str, Enum):
+    ZERO_STARS = "0"
     ONE_STAR = "1"
     TWO_STARS = "2"
     THREE_STARS = "3"

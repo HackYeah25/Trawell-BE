@@ -11,7 +11,7 @@ import re
 from datetime import datetime
 
 from app.models.user import UserProfile, UserPreferences, UserConstraints, TokenData
-from app.models.destination import Rating
+from app.models.destination import Rating, DestinationRecommendation, DestinationInfo
 
 from app.services.supabase_service import get_supabase
 from app.agents.brainstorm_agent import BrainstormAgent
@@ -682,17 +682,40 @@ async def get_session_recommendations(
 
 
 @router.post("/session/{session_id}/create_recommendation")
-async def create_recommendation(session_id: str):
+async def create_recommendation(session_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
     """Create recommendation for a session (legacy endpoint)"""
-    if session_id not in active_agents:
-        raise HTTPException(status_code=404, detail="Session not found")
+    user_id = current_user.user_id if current_user else TEST_USER_ID
+    supabase = get_supabase()
 
-    agent = active_agents[session_id]
-    recommendation = agent.create_recommendation()
-    return recommendation
+    try:
+        if not supabase.client:
+            raise HTTPException(status_code=500, detail="Database not available")
+        recomendation = DestinationRecommendation(
+            recommendation_id=uuid.uuid4(),
+            user_id=user_id,
+            destination=DestinationInfo(
+                name="",
+                country="",
+                region="",
+                coordinates=None,
+                description=None
+            ),
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        result = supabase.create_recommendation(recomendation)
+        return result
+
+    except Exception as e:
+        print(f"ERROR creating recommendation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/session/{session_id}/recommendation")
-async def get_recommendation(session_id: str):
+async def get_recommendation(session_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
     """Get recommendation for a session"""
     if session_id not in active_agents:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -705,6 +728,7 @@ async def get_recommendation(session_id: str):
 async def update_recommendation(
     session_id: str,
     id: str, 
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
     rating: Rating,
     **kwargs):
     """Update recommendation for a session"""

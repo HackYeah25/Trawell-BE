@@ -257,3 +257,21 @@ async def customize_itinerary(
         status_code=501,
         detail="Itinerary customization not yet implemented"
     )
+from app.prompts.loader import get_prompt_loader
+
+@router.get("/technical-details")
+async def get_technical_details(
+    destination: str,
+    current_user: TokenData = Depends(get_current_user)
+):
+    """
+    Get technical details for a destination
+    """
+    print(f"Getting technical details for {destination}")
+    prompt_loader = get_prompt_loader()
+
+    return prompt_loader.load_template(
+        module="planning",
+        prompt_name="location_technical_details",
+        destination=destination
+    )

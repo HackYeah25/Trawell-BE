@@ -241,24 +241,6 @@ Current date: {datetime.now().strftime('%Y-%m-%d')}
                 history.append({"role": "assistant", "content": message.content})
         return history
 
-    def create_recommendation(self) -> DestinationRecommendation:
-        """Get recommendation for a session"""
-        recommendation = DestinationRecommendation(
-            recommendation_id=uuid4(),
-            user_id=self.user_profile.user_id,
-            destination=DestinationInfo(
-                name="",
-                country="",
-                region="",
-                coordinates=None,
-                description=None
-            ),
-            created_at=datetime.now(),
-            updated_at=datetime.now()
-        )
-        ret_recommendation = self.supabase.create_recommendation(recommendation)
-        return ret_recommendation
-
     def get_recommendation(self, recommendation_id: str) -> DestinationRecommendation:
         """Get recommendation for a session"""
         recommendation_list = self.supabase.get_user_recommendations(self.user_profile.user_id)
