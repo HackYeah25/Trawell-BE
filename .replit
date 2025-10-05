@@ -6,7 +6,8 @@ expertMode = true
 channel = "stable-25_05"
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "autoscale"
+run = ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
 
 [workflows]
 runButton = "Project"
